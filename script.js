@@ -1,13 +1,8 @@
 <script>
-/* ============================================= */
-/* COMPLETE JAVASCRIPT - TOOL CALL RESPONSE     */
-/* Button clicks now work with Vapi!            */
-/* ============================================= */
+
 
 (() => {
-  // =========================
-  // CONFIG
-  // =========================
+
   const ASSISTANT_ID = "f672758a-e394-4c2e-a0f1-f82e85273f35";
   const CREATE_CALL_ENDPOINT = "https://vapi-ws-bridge.rizwin.workers.dev/";
   const BRIDGE_SECRET = null;
@@ -1685,4 +1680,5 @@ function setUiProcessing(isProcessing) {
     testUserMessage: (msg) => sendAsUserMessage(msg),
   };
 })();
+
 </script>

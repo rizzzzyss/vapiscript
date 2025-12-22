@@ -46,8 +46,8 @@
     // ============================================
     
     // !!! IMPORTANT: UPDATE THESE WITH YOUR WORKER URLs !!!
-    const GEMINI_WORKER_URL = "https://your-gemini-worker.workers.dev"; // Replace with your worker URL
-    const RESEND_WORKER_URL = "https://your-resend-worker.workers.dev"; // Replace with your worker URL
+    const GEMINI_WORKER_URL = "https://geminiworker.rizwin.workers.dev/"; // Replace with your worker URL
+    const RESEND_WORKER_URL = "https://resendworker.rizwin.workers.dev/"; // Replace with your worker URL
     const WORKER_SECRET = null; // Set if you configured WORKER_SECRET in your workers
     
     const ADMIN_EMAIL = "rizwinazeez@gmail.com";

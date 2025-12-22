@@ -857,20 +857,17 @@
     }
 
     // MODIFIED: approveBtn now triggers BRD generation
-    approveBtn?.addEventListener("click", async () => {
-      console.log("[Click] Approving preview - Starting BRD generation");
-      setUiProcessing(true);
-      
-      // Send approval to AI (keeps conversation flow)
-      sendToolResult({
-        action: "approved",
-        collected: window.__vapiUi.collected
-      });
-      sendAsUserMessage("I approve this");
-      
-      // Start BRD generation
-      await generateFullBRD();
-    });
+   approveBtn?.addEventListener("click", async () => {
+  console.log("[Click] Approving preview - Starting BRD generation");
+  setUiProcessing(true);
+  
+  // Clear pending tool call so AI doesn't interrupt
+  pendingToolCallId = null;
+  pendingToolName = null;
+  
+  // Start BRD generation (skip AI email flow)
+  await generateFullBRD();
+});
 
     function renderEmailScreen() {
       setHeader("Submit", "Where should we send this?");
@@ -1824,4 +1821,5 @@
     // DOM is already ready
     init();
   }
+
 })();

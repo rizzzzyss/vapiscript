@@ -692,18 +692,25 @@
           return;
         }
         if (a === "ui_show_email") {
-          pendingToolCallId = s;
-          pendingToolName = a;
-          renderEmailScreen();
-          return;
+         // Block email screen if Preview is showing or in BRD mode
+  if (screenPreview?.classList.contains("is-active") || inBRDMode) {
+    console.log("[ui_show_email] BLOCKED - Preview active or BRD mode");
+    return;
+  }
+  pendingToolCallId = s;
+  pendingToolName = a;
+  renderEmailScreen();
+  return;
         }
         if (a === "ui_close") {
-         // Block close on important screens
-  const protectedScreens = [screenPreview, screenBRD, screenLoading, screenSuccess];
-  const isProtected = protectedScreens.some(screen => screen?.classList.contains("is-active"));
-  
-  if (isProtected || inBRDMode) {
-    console.log("[ui_close] BLOCKED - Protected screen is active");
+     // Block close on protected screens
+  const isProtected = screenPreview?.classList.contains("is-active") ||
+                      screenLoading?.classList.contains("is-active") ||
+                      screenBRD?.classList.contains("is-active") ||
+                      screenSuccess?.classList.contains("is-active") ||
+                      inBRDMode;
+  if (isProtected) {
+    console.log("[ui_close] BLOCKED - Protected screen active");
     return;
   }
   hideOverlay();
@@ -1227,5 +1234,6 @@
     init();
   }
 })();
+
 
 

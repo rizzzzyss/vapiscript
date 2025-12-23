@@ -1086,41 +1086,93 @@
     }
 
     async function generatePDF() {
-      if (typeof html2pdf === 'undefined') throw new Error('html2pdf.js not loaded');
-      
-      const pdfContent = buildPDFContent();
-      const collected = window.__vapiUi.collected;
-      const container = document.createElement('div');
-      container.innerHTML = pdfContent;
-      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px';
-      document.body.appendChild(container);
-      
-      const service = (collected.service || 'Project').replace(/\s+/g, '-');
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `BRD-${service}-${date}.pdf`;
-      
-      try {
-        const pdfBlob = await html2pdf().set({
-          margin: [10, 10, 10, 10], filename, image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(container).outputPdf('blob');
-        
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(pdfBlob);
-        });
-        
-        generatedBRD.pdfBlob = pdfBlob;
-        generatedBRD.pdfBase64 = base64;
-        generatedBRD.pdfFilename = filename;
-        return { blob: pdfBlob, base64, filename };
-      } finally {
-        document.body.removeChild(container);
-      }
+  if (typeof html2pdf === "undefined") throw new Error("html2pdf.js not loaded");
+
+  const pdfContent = buildPDFContent();
+  const collected = window.__vapiUi.collected || {};
+
+  // Create offscreen render container
+  const container = document.createElement("div");
+  container.innerHTML = pdfContent;
+
+  // ✅ FORCE print-safe colors (prevents “white-on-white”)
+  container.style.cssText = `
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 800px;
+    background: #ffffff;
+    color: #111111;
+    z-index: -1;
+    opacity: 0;
+    pointer-events: none;
+  `;
+
+  // Hard override any white text from your UI theme
+  container.querySelectorAll("*").forEach((el) => {
+    el.style.color = "#111";
+    // prevent dark UI blocks from becoming weird in PDF
+    if (getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)" ) return;
+    // optional: comment this out if you WANT dark blocks in PDF
+    // el.style.backgroundColor = "transparent";
+  });
+
+  // Optional: body is “fixed/overflow hidden” during overlay (can affect rendering)
+  const hadOverlayClass = document.body.classList.contains("vapi-overlay-open");
+  if (hadOverlayClass) document.body.classList.remove("vapi-overlay-open");
+
+  document.body.appendChild(container);
+
+  const service = (collected.service || "Project").replace(/\s+/g, "-");
+  const date = new Date().toISOString().split("T")[0];
+  const filename = `BRD-${service}-${date}.pdf`;
+
+  try {
+    // Debug guard: if this is near-empty, PDF will be blank no matter what
+    if (!container.innerText.trim()) {
+      throw new Error("PDF content is empty (buildPDFContent() rendered nothing).");
     }
+
+    const worker = html2pdf()
+      .set({
+        margin: [10, 10, 10, 10],
+        filename,
+        pagebreak: { mode: ["css", "legacy"] },
+        image: { type: "jpeg", quality: 0.95 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: "#ffffff"
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+      })
+      .from(container)
+      .toPdf();
+
+    // ✅ Most reliable: get jsPDF then output blob
+    const pdf = await worker.get("pdf");
+    const pdfBlob = pdf.output("blob"); // <-- avoids “missing argument” style issues
+
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    generatedBRD.pdfBlob = pdfBlob;
+    generatedBRD.pdfBase64 = base64;
+    generatedBRD.pdfFilename = filename;
+
+    return { blob: pdfBlob, base64, filename };
+  } finally {
+    document.body.removeChild(container);
+    if (hadOverlayClass) document.body.classList.add("vapi-overlay-open");
+  }
+}
+
 
     async function sendBRDEmail(userEmail) {
       const collected = window.__vapiUi.collected;
@@ -1234,6 +1286,7 @@
     init();
   }
 })();
+
 
 
 

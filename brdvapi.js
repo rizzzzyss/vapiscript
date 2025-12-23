@@ -1226,7 +1226,7 @@
     };
 
     console.log('[Vapi] Voice assistant initialized with BRD Mode lock!');
-  }}
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
@@ -1234,6 +1234,7 @@
     init();
   }
 })();
+
 
 
 

@@ -698,9 +698,15 @@
           return;
         }
         if (a === "ui_close") {
-          hideOverlay();
-        }
-      });
+         // Block close on important screens
+  const protectedScreens = [screenPreview, screenBRD, screenLoading, screenSuccess];
+  const isProtected = protectedScreens.some(screen => screen?.classList.contains("is-active"));
+  
+  if (isProtected || inBRDMode) {
+    console.log("[ui_close] BLOCKED - Protected screen is active");
+    return;
+  }
+  hideOverlay();
     }
 
     // ============================================
@@ -1221,4 +1227,5 @@
     init();
   }
 })();
+
 

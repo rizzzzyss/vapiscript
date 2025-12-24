@@ -1073,41 +1073,69 @@
     }
 
     async function generatePDF() {
-      if (typeof html2pdf === 'undefined') throw new Error('html2pdf.js not loaded');
-      
-      const pdfContent = buildPDFContent();
-      const collected = window.__vapiUi.collected;
-      const container = document.createElement('div');
-      container.innerHTML = pdfContent;
-      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px';
-      document.body.appendChild(container);
-      
-      const service = (collected.service || 'Project').replace(/\s+/g, '-');
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `BRD-${service}-${date}.pdf`;
-      
-      try {
-        const pdfBlob = await html2pdf().set({
-          margin: [10, 10, 10, 10], filename, image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(container).outputPdf('blob');
-        
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(pdfBlob);
-        });
-        
-        generatedBRD.pdfBlob = pdfBlob;
-        generatedBRD.pdfBase64 = base64;
-        generatedBRD.pdfFilename = filename;
-        return { blob: pdfBlob, base64, filename };
-      } finally {
-        document.body.removeChild(container);
-      }
-    }
+  if (typeof html2pdf === 'undefined') throw new Error('html2pdf.js not loaded');
+  
+  const pdfContent = buildPDFContent();
+  const collected = window.__vapiUi.collected;
+  
+  // Create visible container (needed for proper rendering)
+  const container = document.createElement('div');
+  container.innerHTML = pdfContent;
+  container.style.cssText = 'position:fixed;left:0;top:0;width:800px;background:#fff;z-index:-9999;opacity:0;pointer-events:none;';
+  document.body.appendChild(container);
+  
+  // Wait for images to load
+  const images = container.querySelectorAll('img');
+  if (images.length > 0) {
+    await Promise.all([...images].map(img => {
+      return new Promise((resolve) => {
+        if (img.complete) return resolve();
+        img.onload = resolve;
+        img.onerror = resolve;
+        setTimeout(resolve, 3000); // Timeout after 3s
+      });
+    }));
+  }
+  
+  // Small delay for rendering
+  await new Promise(r => setTimeout(r, 500));
+  
+  const service = (collected.service || 'Project').replace(/\s+/g, '-');
+  const date = new Date().toISOString().split('T')[0];
+  const filename = `BRD-${service}-${date}.pdf`;
+  
+  try {
+    const pdfBlob = await html2pdf().set({
+      margin: [15, 15, 15, 15],
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false, 
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        windowWidth: 800
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    }).from(container).outputPdf('blob');
+    
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(pdfBlob);
+    });
+    
+    generatedBRD.pdfBlob = pdfBlob;
+    generatedBRD.pdfBase64 = base64;
+    generatedBRD.pdfFilename = filename;
+    return { blob: pdfBlob, base64, filename };
+  } finally {
+    document.body.removeChild(container);
+  }
+}
 
     async function sendBRDEmail(userEmail) {
       const collected = window.__vapiUi.collected;

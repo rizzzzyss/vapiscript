@@ -1048,11 +1048,12 @@
       if (brdContent && generatedBRD.originalHtml) brdContent.innerHTML = generatedBRD.originalHtml;
     }
 
-    function stripHtmlWrapper(html) {
+function stripHtmlWrapper(html) {
   if (!html) return "";
   
   let content = html;
   
+  // Remove document tags
   content = content.replace(/<!DOCTYPE[^>]*>/gi, "");
   content = content.replace(/<html[^>]*>/gi, "");
   content = content.replace(/<\/html>/gi, "");
@@ -1062,9 +1063,12 @@
   content = content.replace(/<meta[^>]*>/gi, "");
   content = content.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "");
   
+  // ✅ Also remove style tags that might conflict
+  content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+  
   content = content.trim();
   
-  console.log("[stripHtmlWrapper] Original length:", html.length, "→ Stripped length:", content.length);
+  console.log("[stripHtmlWrapper] Stripped:", html.length, "→", content.length);
   
   return content;
 }
@@ -1134,267 +1138,163 @@ async function generatePDF() {
 
   log("========== PDF GENERATION START ==========");
 
-  // Step 1: Check library
-  log("Step 1: Checking html2pdf library...");
   if (typeof html2pdf === "undefined") {
     err("❌ html2pdf.js is NOT loaded!");
     throw new Error("html2pdf.js not loaded");
   }
   log("✅ html2pdf.js is loaded");
 
-  // Step 2: Check html2canvas
-  log("Step 2: Checking html2canvas library...");
-  if (typeof html2canvas === "undefined") {
-    warn("⚠️ html2canvas not found as standalone (may be bundled in html2pdf)");
-  } else {
-    log("✅ html2canvas is loaded");
-  }
-
-  // Step 3: Check collected data
-  log("Step 3: Checking collected data...");
   const collected = window.__vapiUi?.collected || {};
-  log("Collected data:", JSON.stringify(collected, null, 2));
-  log("Number of collected fields:", Object.keys(collected).length);
+  log("Collected data:", Object.keys(collected).length, "fields");
 
-  // Step 4: Check BRD content sources
-  log("Step 4: Checking BRD content sources...");
-  log("brdContent element exists:", !!brdContent);
-  log("brdContent.innerHTML length:", brdContent?.innerHTML?.length || 0);
-  log("brdContent.innerHTML preview:", brdContent?.innerHTML?.substring(0, 200) || "EMPTY");
-  log("generatedBRD.html length:", generatedBRD.html?.length || 0);
-  log("generatedBRD.html preview:", generatedBRD.html?.substring(0, 200) || "EMPTY");
-  log("generatedBRD.originalHtml length:", generatedBRD.originalHtml?.length || 0);
-
-  // Step 5: Build PDF content
-  log("Step 5: Building PDF content...");
+  // Build PDF content
+  log("Building PDF content...");
   const pdfContent = buildPDFContent();
-  log("buildPDFContent() returned length:", pdfContent?.length || 0);
-  log("buildPDFContent() preview:", pdfContent?.substring(0, 300) || "EMPTY");
+  log("Content length:", pdfContent?.length || 0);
 
   if (!pdfContent || pdfContent.length < 100) {
-    err("❌ PDF content is empty or too short!");
-    err("This means buildPDFContent() failed to get any content");
-    throw new Error("PDF content is empty or too short");
+    err("❌ PDF content is empty!");
+    throw new Error("PDF content is empty");
   }
-  log("✅ PDF content looks valid");
 
-  // Step 6: Create container
-  log("Step 6: Creating render container...");
+  // Create container
+  log("Creating render container...");
   const container = document.createElement("div");
   container.id = "pdf-render-root-" + Date.now();
   container.innerHTML = pdfContent;
 
+  // ✅ KEY FIX: Override ALL problematic CSS
   container.style.cssText = `
-    position: absolute;
-    left: -9999px;
-    top: 0;
-    width: 800px;
-    min-height: 100px;
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 800px !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: auto !important;
+    overflow: visible !important;
     background: #fff !important;
     color: #111 !important;
-    font-family: Arial, sans-serif;
-    visibility: visible;
-    opacity: 1;
+    font-family: Arial, sans-serif !important;
+    z-index: 999999 !important;
+    contain: none !important;
+    isolation: auto !important;
+    transform: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: none !important;
   `;
 
   document.body.appendChild(container);
-  log("✅ Container appended to body");
-  log("Container ID:", container.id);
-  log("Container offsetWidth:", container.offsetWidth);
-  log("Container offsetHeight:", container.offsetHeight);
-  log("Container childNodes count:", container.childNodes.length);
 
-  if (container.offsetHeight < 10) {
-    warn("⚠️ Container height is very small - content may not be rendering");
+  // ✅ FIX: Remove contain/overflow from ALL children
+  container.querySelectorAll("*").forEach(el => {
+    el.style.contain = "none";
+    el.style.overflow = "visible";
+    el.style.maxHeight = "none";
+    el.style.isolation = "auto";
+  });
+
+  // Force reflow
+  void container.offsetHeight;
+
+  log("Container dimensions:", container.offsetWidth, "x", container.offsetHeight);
+
+  if (container.offsetHeight < 100) {
+    warn("⚠️ Container height too small:", container.offsetHeight);
   }
 
-  // Step 7: Fix text colors
-  log("Step 7: Fixing text colors...");
-  let colorFixCount = 0;
-  container.querySelectorAll("*").forEach(el => {
-    const style = getComputedStyle(el);
-    if (style.color === "rgb(255, 255, 255)" || style.color === "rgba(255, 255, 255, 1)") {
-      el.style.color = "#111";
-      colorFixCount++;
-    }
-  });
-  log("Fixed", colorFixCount, "elements with white text");
+  // Wait for DOM
+  await new Promise(resolve => setTimeout(resolve, 200));
 
-  // Step 8: Wait for DOM
-  log("Step 8: Waiting for DOM to settle...");
-  await new Promise(resolve => setTimeout(resolve, 100));
-  log("✅ DOM settle wait complete");
-
-  // Step 9: Check and wait for images
-  log("Step 9: Checking images...");
+  // Wait for images
   const images = container.querySelectorAll("img");
-  log("Number of images found:", images.length);
-
   if (images.length > 0) {
-    log("Waiting for images to load...");
-    const imageResults = await Promise.all(
-      Array.from(images).map((img, index) =>
+    log("Waiting for", images.length, "images...");
+    await Promise.all(
+      Array.from(images).map(img =>
         new Promise(resolve => {
-          const imgInfo = {
-            index,
-            src: img.src?.substring(0, 100),
-            complete: img.complete,
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight
-          };
-
-          if (img.complete && img.naturalWidth > 0) {
-            log(`Image ${index}: Already loaded`, imgInfo);
-            resolve({ status: "already-loaded", ...imgInfo });
-          } else {
-            img.onload = () => {
-              log(`Image ${index}: Loaded successfully`, imgInfo);
-              resolve({ status: "loaded", ...imgInfo });
-            };
-            img.onerror = () => {
-              warn(`Image ${index}: Failed to load`, imgInfo);
-              resolve({ status: "error", ...imgInfo });
-            };
+          if (img.complete && img.naturalWidth > 0) resolve();
+          else {
+            img.onload = resolve;
+            img.onerror = resolve;
           }
         })
       )
     );
-    log("Image loading results:", imageResults);
   }
 
-  await new Promise(resolve => setTimeout(resolve, 50));
-  log("✅ Image loading complete");
+  await new Promise(resolve => setTimeout(resolve, 100));
 
-  // Step 10: Prepare filename
-  log("Step 10: Preparing filename...");
+  // Prepare filename
   const service = (collected.service || "Project").replace(/\s+/g, "-");
   const date = new Date().toISOString().split("T")[0];
   const filename = `BRD-${service}-${date}.pdf`;
   log("Filename:", filename);
 
-  // Step 11: Generate PDF
-  log("Step 11: Starting html2pdf generation...");
-  log("Container final check - offsetWidth:", container.offsetWidth, "offsetHeight:", container.offsetHeight);
-
   try {
+    log("Starting PDF generation...");
     const startTime = performance.now();
 
-    const pdfOptions = {
-      margin: [15, 15, 15, 15],
-      filename,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        logging: true, // Enable html2canvas logging
-        backgroundColor: "#ffffff",
-        windowWidth: 800,
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-      pagebreak: { mode: ["avoid-all", "css", "legacy"] }
-    };
-    log("PDF options:", JSON.stringify(pdfOptions, null, 2));
-
-    const worker = html2pdf().set(pdfOptions).from(container);
-
-    // Try to get canvas first for debugging
-    log("Generating canvas...");
-    let canvas = null;
-    try {
-      await worker.toCanvas();
-      canvas = await worker.get("canvas");
-      if (canvas) {
-        log("✅ Canvas generated successfully");
-        log("Canvas dimensions:", canvas.width, "x", canvas.height);
-
-        // Check if canvas is blank (all white)
-        const ctx = canvas.getContext("2d");
-        const imageData = ctx.getImageData(0, 0, Math.min(canvas.width, 100), Math.min(canvas.height, 100));
-        const pixels = imageData.data;
-        let nonWhitePixels = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-          if (pixels[i] < 250 || pixels[i + 1] < 250 || pixels[i + 2] < 250) {
-            nonWhitePixels++;
-          }
-        }
-        log("Non-white pixels in sample area:", nonWhitePixels);
-        if (nonWhitePixels < 10) {
-          warn("⚠️ Canvas appears to be mostly blank/white!");
-        } else {
-          log("✅ Canvas has content (non-white pixels detected)");
-        }
-      } else {
-        warn("⚠️ Canvas is null");
-      }
-    } catch (canvasErr) {
-      err("❌ Canvas generation failed:", canvasErr);
-    }
-
-    // Generate PDF blob
-    log("Generating PDF blob...");
-    const pdfBlob = await worker.outputPdf("blob");
+    const pdfBlob = await html2pdf()
+      .set({
+        margin: [15, 15, 15, 15],
+        filename,
+        image: { type: "jpeg", quality: 0.95 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          width: 800,
+          windowWidth: 800,
+          scrollX: 0,
+          scrollY: 0,
+          // ✅ These help with containment issues
+          foreignObjectRendering: false,
+          removeContainer: true
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["avoid-all", "css", "legacy"] }
+      })
+      .from(container)
+      .outputPdf("blob");
 
     const endTime = performance.now();
-    log("✅ PDF generation complete in", Math.round(endTime - startTime), "ms");
-    log("PDF blob size:", pdfBlob.size, "bytes");
-    log("PDF blob type:", pdfBlob.type);
+    log("✅ PDF generated in", Math.round(endTime - startTime), "ms");
+    log("PDF size:", pdfBlob.size, "bytes");
 
-    if (pdfBlob.size < 1000) {
-      warn("⚠️ PDF blob is very small - likely empty or corrupted");
-    } else if (pdfBlob.size < 5000) {
-      warn("⚠️ PDF blob is smaller than expected");
-    } else {
-      log("✅ PDF blob size looks reasonable");
+    if (pdfBlob.size < 5000) {
+      warn("⚠️ PDF seems too small");
     }
 
-    // Step 12: Convert to base64
-    log("Step 12: Converting to base64...");
+    // Convert to base64
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result.split(",")[1];
-        log("✅ Base64 conversion complete, length:", result.length);
-        resolve(result);
-      };
-      reader.onerror = () => {
-        err("❌ FileReader error");
-        reject(new Error("Failed to read PDF blob"));
-      };
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.onerror = () => reject(new Error("FileReader failed"));
       reader.readAsDataURL(pdfBlob);
     });
 
-    // Step 13: Store results
-    log("Step 13: Storing results...");
+    log("✅ Base64 length:", base64.length);
+
+    // Store results
     generatedBRD.pdfBlob = pdfBlob;
     generatedBRD.pdfBase64 = base64;
     generatedBRD.pdfFilename = filename;
-    log("✅ Results stored in generatedBRD");
 
-    log("========== PDF GENERATION SUCCESS ==========");
-    log("Summary:");
-    log("  - Filename:", filename);
-    log("  - Blob size:", pdfBlob.size, "bytes");
-    log("  - Base64 length:", base64.length);
-
+    log("========== PDF SUCCESS ==========");
     return { blob: pdfBlob, base64, filename };
 
   } catch (error) {
-    err("========== PDF GENERATION FAILED ==========");
-    err("Error:", error);
-    err("Error message:", error.message);
-    err("Error stack:", error.stack);
+    err("❌ PDF generation failed:", error.message);
     throw error;
 
   } finally {
-    // Step 14: Cleanup
-    log("Step 14: Cleaning up...");
     if (container.parentNode) {
       container.remove();
-      log("✅ Container removed from DOM");
+      log("Container cleaned up");
     }
-    log("========== PDF GENERATION END ==========");
   }
 }
 

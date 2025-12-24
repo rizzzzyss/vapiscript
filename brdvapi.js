@@ -830,10 +830,28 @@
       return n.websocketCallUrl;
     }
 
-    function createWorkletProcessorBlob() {
-      const e = `class VapiAudioProcessor extends AudioWorkletProcessor{constructor(){super();this.bufferSize=${AUDIO_CONFIG.workletBufferSize};this.buffer=new Float32Array(this.bufferSize);this.bufferIndex=0;this.inputSampleRate=sampleRate;this.outputSampleRate=16000;this.needsResampling=Math.abs(this.inputSampleRate-this.outputSampleRate)>100}resample(input){if(!this.needsResampling)return input;const ratio=this.inputSampleRate/this.outputSampleRate;const len=Math.floor(input.length/ratio);const out=new Float32Array(len);for(let i=0;i<len;i++){const idx=i*ratio;const f=Math.floor(idx);const c=Math.min(f+1,input.length-1);out[i]=input[f]*(1-(idx-f))+input[c]*(idx-f)}return out}floatTo16BitPCM(arr){const out=new Int16Array(arr.length);for(let i=0;i<arr.length;i++){const s=Math.max(-1,Math.min(1,arr[i]));out[i]=s<0?s*32768:s*32767}return out}process(inputs){const input=inputs[0];if(!input||!input[0])return true;for(let i=0;i<input[0].length;i++){this.buffer[this.bufferIndex++]=input[0][i];if(this.bufferIndex>=this.bufferSize){const resampled=this.resample(this.buffer);const pcm=this.floatTo16BitPCM(resampled);this.port.postMessage(pcm.buffer,[pcm.buffer]);this.bufferIndex=0;this.buffer=new Float32Array(this.bufferSize)}}return true}}registerProcessor('vapi-audio-processor',VapiAudioProcessor);`;
-      return URL.createObjectURL(new Blob([e], { type: "application/javascript" }));
-    }
+   // Option B – Array join (zero risk of template literal issues)
+function createWorkletProcessorBlob() {
+  const lines = [
+    "class VapiAudioProcessor extends AudioWorkletProcessor {",
+    "  constructor() {",
+    "    super();",
+    `    this.bufferSize = ${AUDIO_CONFIG.workletBufferSize};`,
+    "    this.buffer = new Float32Array(this.bufferSize);",
+    "    this.bufferIndex = 0;",
+    "    this.inputSampleRate = sampleRate;",
+    "    this.outputSampleRate = 16000;",
+    "    this.needsResampling = Math.abs(this.inputSampleRate - this.outputSampleRate) > 100;",
+    "  }",
+    // ... rest of the methods
+    "}",
+    "",
+    "registerProcessor('vapi-audio-processor', VapiAudioProcessor);"
+  ];
+
+  const code = lines.join("\n");
+  return URL.createObjectURL(new Blob([code], { type: "application/javascript" }));
+}
 
     function extractTranscriptMessage(e) {
       const t = e?.transcript || e?.text || e?.content || e?.message?.content || e?.message?.text;
@@ -1286,6 +1304,7 @@
     init();
   }
 })();
+
 
 
 

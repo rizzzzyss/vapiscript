@@ -1048,6 +1048,26 @@
       if (brdContent && generatedBRD.originalHtml) brdContent.innerHTML = generatedBRD.originalHtml;
     }
 
+    function stripHtmlWrapper(html) {
+  if (!html) return "";
+  
+  let content = html;
+  
+  content = content.replace(/<!DOCTYPE[^>]*>/gi, "");
+  content = content.replace(/<html[^>]*>/gi, "");
+  content = content.replace(/<\/html>/gi, "");
+  content = content.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
+  content = content.replace(/<body[^>]*>/gi, "");
+  content = content.replace(/<\/body>/gi, "");
+  content = content.replace(/<meta[^>]*>/gi, "");
+  content = content.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "");
+  
+  content = content.trim();
+  
+  console.log("[stripHtmlWrapper] Original length:", html.length, "→ Stripped length:", content.length);
+  
+  return content;
+}
 
 function buildPDFContent() {
   const collected = window.__vapiUi.collected || {};
@@ -1057,11 +1077,12 @@ function buildPDFContent() {
     day: "numeric"
   });
 
-  // ✅ Avoid empty brdContent overriding generatedBRD.html
-  const editedBRD =
-    (brdContent?.innerHTML && brdContent.innerHTML.trim())
-      ? brdContent.innerHTML
-      : (generatedBRD.html || "");
+  let editedBRD = (brdContent?.innerHTML && brdContent.innerHTML.trim())
+    ? brdContent.innerHTML
+    : (generatedBRD.html || "");
+
+  // ✅ Strip the HTML wrapper (fixes zero-height canvas issue)
+  editedBRD = stripHtmlWrapper(editedBRD);
 
   let html = `
     <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; background:#fff;">

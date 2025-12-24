@@ -1209,6 +1209,7 @@ container.style.cssText = 'position:fixed;left:0;top:0;width:800px;background:#f
       getGeneratedBRD: () => generatedBRD,
       getBRDMode: () => inBRDMode,
       unlockBRDMode: () => { inBRDMode = false; if (closeBtn) closeBtn.style.display = ''; console.log("BRD mode unlocked"); }
+      testPDFContent: () => buildPDFContent()  
     };
 
     console.log('[Vapi] Voice assistant initialized with BRD Mode lock!');

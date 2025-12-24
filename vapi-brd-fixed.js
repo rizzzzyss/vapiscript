@@ -1108,78 +1108,134 @@ container.style.cssText = 'position:fixed;left:0;top:0;width:800px;background:#f
       }
     }
 */
-    async function generatePDF() {
-  if (typeof html2pdf === 'undefined') throw new Error('html2pdf.js not loaded');
+async function generatePDF() {
+  const t0 = performance.now();
+  const log = (...a) => console.log("%c[PDF]", "color:#0aa;font-weight:700", ...a);
 
-  // 1️⃣ Build content
-  const pdfContent = buildPDFContent();
-  const collected = window.__vapiUi.collected;
-
-  // 2️⃣ Prepare visible (but off-screen) render container
-  const container = document.createElement('div');
-  container.innerHTML = pdfContent;
-  container.style.cssText = `
-    position: absolute;
-    left: -10000px;
-    top: 0;
-    width: 800px;
-    background: #fff;
-    color: #111;
-    opacity: 1;
-    pointer-events: none;
-  `;
-  document.body.appendChild(container);
-
-  // 3️⃣ Fix white text (if copied from dark UI)
-  container.querySelectorAll('*').forEach(el => {
-    const c = getComputedStyle(el).color;
-    if (c === 'rgb(255, 255, 255)') el.style.color = '#111';
-  });
-
-  // 4️⃣ Wait for layout & image loading
-  await new Promise(requestAnimationFrame);
-  const imgs = Array.from(container.querySelectorAll("img"));
-  await Promise.all(imgs.map(img => new Promise(res => {
-    if (img.complete && img.naturalWidth > 0) return res();
-    img.addEventListener("load", res, { once: true });
-    img.addEventListener("error", res, { once: true });
-  })));
-
-  // 5️⃣ Define filename
-  const service = (collected.service || 'Project').replace(/\s+/g, '-');
-  const date = new Date().toISOString().split('T')[0];
-  const filename = `BRD-${service}-${date}.pdf`;
-
-  // 6️⃣ Generate and store
   try {
+    log("START");
+
+    if (typeof html2pdf === "undefined") {
+      log("❌ html2pdf is undefined. Script not loaded.");
+      throw new Error("html2pdf.js not loaded");
+    }
+
+    const collected = window.__vapiUi?.collected || {};
+    log("Collected keys:", Object.keys(collected));
+
+    const pdfContent = buildPDFContent();
+    log("buildPDFContent length:", pdfContent?.length);
+
+    // Create container
+    const container = document.createElement("div");
+    container.id = "pdf-render-root";
+    container.innerHTML = pdfContent;
+
+    // Off-screen but VISIBLE (no opacity:0)
+    container.style.cssText = `
+      position:absolute;
+      left:-10000px;
+      top:0;
+      width:800px;
+      background:#fff !important;
+      color:#111 !important;
+      opacity:1 !important;
+      visibility:visible !important;
+      pointer-events:none;
+      z-index:999999;
+    `;
+
+    document.body.appendChild(container);
+
+    // Log container status
+    log("✅ Container appended:", !!document.getElementById("pdf-render-root"));
+    log("Container innerHTML length:", container.innerHTML.length);
+    log("Container rect:", container.getBoundingClientRect());
+
+    const cs = getComputedStyle(container);
+    log("Container computed:", {
+      display: cs.display,
+      opacity: cs.opacity,
+      visibility: cs.visibility,
+      background: cs.backgroundColor,
+      color: cs.color
+    });
+
+    // Give browser time to layout/paint
+    await new Promise(requestAnimationFrame);
+    await new Promise(r => setTimeout(r, 80));
+    log("After paint tick");
+
+    // Wait for images
+    const imgs = Array.from(container.querySelectorAll("img"));
+    log("Images found:", imgs.length);
+
+    await Promise.all(
+      imgs.map((img, i) => new Promise(res => {
+        const done = (status) => {
+          log(`IMG[${i}] ${status}`, {
+            src: img.currentSrc || img.src,
+            complete: img.complete,
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight
+          });
+          res();
+        };
+        if (img.complete && img.naturalWidth > 0) return done("already-loaded");
+        img.addEventListener("load", () => done("loaded"), { once: true });
+        img.addEventListener("error", () => done("error"), { once: true });
+      }))
+    );
+
+    // Filename
+    const service = (collected.service || "Project").replace(/\s+/g, "-");
+    const date = new Date().toISOString().split("T")[0];
+    const filename = `BRD-${service}-${date}.pdf`;
+    log("Filename:", filename);
+
+    // Generate PDF
+    log("Generating PDF...");
     const pdfBlob = await html2pdf()
       .set({
         margin: [10, 10, 10, 10],
         filename,
-        image: { type: 'jpeg', quality: 0.95 },
+        image: { type: "jpeg", quality: 0.95 },
         html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
       })
       .from(container)
-      .outputPdf('blob');
+      .outputPdf("blob");
+
+    log("✅ PDF blob:", { size: pdfBlob.size, type: pdfBlob.type });
 
     // Convert to base64
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onload = () => resolve(reader.result.split(",")[1]);
       reader.onerror = reject;
       reader.readAsDataURL(pdfBlob);
     });
 
+    log("✅ Base64 length:", base64.length);
+
+    // Store for email/download
     generatedBRD.pdfBlob = pdfBlob;
     generatedBRD.pdfBase64 = base64;
     generatedBRD.pdfFilename = filename;
+
+    log("DONE in ms:", Math.round(performance.now() - t0));
     return { blob: pdfBlob, base64, filename };
+
+  } catch (err) {
+    console.error("[PDF] ❌ ERROR:", err);
+    throw err;
   } finally {
-    // 7️⃣ Clean up after rendering
-    document.body.removeChild(container);
+    const el = document.getElementById("pdf-render-root");
+    if (el) el.remove();
+    console.log("%c[PDF] CLEANUP done", "color:#999");
   }
 }
+
 
     async function sendBRDEmail(userEmail) {
       const collected = window.__vapiUi.collected;

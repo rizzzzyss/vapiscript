@@ -1633,6 +1633,14 @@ function buildPDFContent() {
    - SMARTCUT (prefer whitespace => avoid splitting text)
    - optional footer to make bottom whitespace look intentional
    ============================================= */
+/* =============================================
+   FINAL PRODUCTION generatePDF()
+   - Works with your buildPDFContent() exactly
+   - Keeps old generatedBRD.pdfBase64/pdfBlob/pdfFilename
+   - SmartCut (avoid split lines)
+   - Reserves footer space (footer won't cut content)
+   - Removes duplicate BRD headings safely (keep first)
+   ============================================= */
 
 async function generatePDF() {
   const log = (...a) => console.log("%c[PDF]", "color:#0aa;font-weight:700", ...a);
@@ -1641,84 +1649,42 @@ async function generatePDF() {
   log("========== PDF GENERATION START ==========");
 
   // ----------------------------
-  // Load dependencies
+  // Load deps (cdn)
   // ----------------------------
   if (!window.jspdf?.jsPDF) {
     log("Loading jsPDF...");
     await new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
-      script.onload = resolve;
-      script.onerror = () => reject(new Error("Failed to load jsPDF"));
-      document.head.appendChild(script);
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("Failed to load jsPDF"));
+      document.head.appendChild(s);
     });
   }
 
-  if (typeof html2canvas === "undefined") {
+  if (typeof window.html2canvas === "undefined") {
     log("Loading html2canvas...");
     await new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
-      script.onload = resolve;
-      script.onerror = () => reject(new Error("Failed to load html2canvas"));
-      document.head.appendChild(script);
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("Failed to load html2canvas"));
+      document.head.appendChild(s);
     });
   }
 
   const collected = window.__vapiUi?.collected || {};
-  const pdfContent = buildPDFContent(); // your existing function
+  const pdfContent = buildPDFContent(); // <-- your existing function
 
   // ----------------------------
   // Helpers
   // ----------------------------
-  const findWhitespaceCutY = (canvas, idealCutY, searchUpPx = 90, searchDownPx = 15) => {
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const w = canvas.width;
-    const h = canvas.height;
-
-    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-    const startY = clamp(Math.floor(idealCutY - searchUpPx), 0, h - 1);
-    const endY = clamp(Math.floor(idealCutY + searchDownPx), 0, h - 1);
-
-    const whiteRatioAtRow = (y) => {
-      const row = ctx.getImageData(0, y, w, 1).data;
-      const step = Math.max(2, Math.floor(w / 220));
-      let white = 0, total = 0;
-
-      for (let x = 0; x < w; x += step) {
-        const i = x * 4;
-        const r = row[i], g = row[i + 1], b = row[i + 2], a = row[i + 3];
-
-        // transparent treated as white
-        if (a < 10) { white++; total++; continue; }
-
-        // near-white threshold (pure white background)
-        if (r >= 248 && g >= 248 && b >= 248) white++;
-        total++;
-      }
-      return total ? white / total : 0;
-    };
-
-    const isGoodGap = (y) => {
-      const needConsecutive = 6; // stricter => fewer splits, more whitespace
-      for (let k = 0; k < needConsecutive; k++) {
-        if (y + k >= h) return false;
-        if (whiteRatioAtRow(y + k) < 0.985) return false;
-      }
-      return true;
-    };
-
-    // Prefer ABOVE ideal cut
-    for (let y = Math.floor(idealCutY); y >= startY; y--) {
-      if (isGoodGap(y)) return y;
-    }
-    // Then slightly BELOW
-    for (let y = Math.floor(idealCutY) + 1; y <= endY; y++) {
-      if (isGoodGap(y)) return y;
-    }
-
-    return clamp(Math.floor(idealCutY), 0, h);
-  };
+  const blobToBase64 = (blob) =>
+    new Promise((resolve) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(",")[1]);
+      r.readAsDataURL(blob);
+    });
 
   const addFooter = (pdf, pageNum, totalPages) => {
     const pageW = pdf.internal.pageSize.getWidth();
@@ -1730,15 +1696,68 @@ async function generatePDF() {
     pdf.text(`Page ${pageNum} of ${totalPages}`, pageW - 10, pageH - 6, { align: "right" });
   };
 
-  const blobToBase64 = (blob) =>
-    new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(",")[1]);
-      reader.readAsDataURL(blob);
-    });
+  const rowIsWhiteEnough = (canvas, y, minRatio = 0.995) => {
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const w = canvas.width;
+    const h = canvas.height;
+    if (y < 0 || y >= h) return false;
+
+    const row = ctx.getImageData(0, y, w, 1).data;
+    const step = Math.max(2, Math.floor(w / 220));
+    let white = 0, total = 0;
+
+    for (let x = 0; x < w; x += step) {
+      const i = x * 4;
+      const r = row[i], g = row[i + 1], b = row[i + 2], a = row[i + 3];
+      if (a < 10 || (r >= 248 && g >= 248 && b >= 248)) white++;
+      total++;
+    }
+    return (white / total) >= minRatio;
+  };
+
+  const findWhitespaceCutY = (canvas, idealCutY, searchUpPx = 220, searchDownPx = 25) => {
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const w = canvas.width;
+    const h = canvas.height;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    const startY = clamp(Math.floor(idealCutY - searchUpPx), 0, h - 1);
+    const endY = clamp(Math.floor(idealCutY + searchDownPx), 0, h - 1);
+
+    const whiteRatioAtRow = (y) => {
+      const row = ctx.getImageData(0, y, w, 1).data;
+      const step = Math.max(2, Math.floor(w / 220));
+      let white = 0, total = 0;
+      for (let x = 0; x < w; x += step) {
+        const i = x * 4;
+        const r = row[i], g = row[i + 1], b = row[i + 2], a = row[i + 3];
+        if (a < 10) { white++; total++; continue; }
+        if (r >= 248 && g >= 248 && b >= 248) white++;
+        total++;
+      }
+      return total ? white / total : 0;
+    };
+
+    const isGoodGap = (y) => {
+      const needConsecutive = 10;
+      for (let k = 0; k < needConsecutive; k++) {
+        if (y + k >= h) return false;
+        if (whiteRatioAtRow(y + k) < 0.995) return false;
+      }
+      return true;
+    };
+
+    for (let y = Math.floor(idealCutY); y >= startY; y--) {
+      if (isGoodGap(y)) return y;
+    }
+    for (let y = Math.floor(idealCutY) + 1; y <= endY; y++) {
+      if (isGoodGap(y)) return y;
+    }
+    return clamp(Math.floor(idealCutY), 0, h);
+  };
 
   // ----------------------------
-  // Create iframe + write HTML
+  // iframe render surface
   // ----------------------------
   const iframe = document.createElement("iframe");
   iframe.style.cssText = `
@@ -1752,62 +1771,65 @@ async function generatePDF() {
   const iframeDoc = iframe.contentDocument;
   iframeDoc.open();
   iframeDoc.write(`
-    <!DOCTYPE html>
+    <!doctype html>
     <html>
-    <head>
-      <meta charset="utf-8" />
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          font-family: Arial, sans-serif;
-          padding: 40px;
-          background: #fff;
-          color: #333;
-          line-height: 1.6;
-          overflow: visible;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        img { max-width: 100%; display: block; }
-      </style>
-    </head>
-    <body>${pdfContent}</body>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background: #fff;
+            color: #333;
+            line-height: 1.6;
+            overflow: visible;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          img { max-width: 100%; display: block; }
+        </style>
+      </head>
+      <body>${pdfContent}</body>
     </html>
   `);
   iframeDoc.close();
   await new Promise((r) => setTimeout(r, 300));
 
   try {
-    // ----------------------------
-    // Wait for images
-    // ----------------------------
+    // Wait images
     const images = iframeDoc.querySelectorAll("img");
-    await Promise.all(Array.from(images).map(img => new Promise((resolve) => {
-      if (img.complete) resolve();
-      else img.onload = img.onerror = () => resolve();
-    })));
+    await Promise.all(
+      Array.from(images).map(
+        (img) =>
+          new Promise((resolve) => {
+            if (img.complete) resolve();
+            else img.onload = img.onerror = () => resolve();
+          })
+      )
+    );
     log("✅ Images loaded");
 
-    // ----------------------------
-    // Remove duplicate inner title (ONLY first page header stays)
-    // Set this selector to your real inner title element
-    // ----------------------------
-    const INNER_TITLE_SELECTOR = ".brd-inner-title"; // <-- change if needed
-    iframeDoc.querySelector(INNER_TITLE_SELECTOR)?.remove();
+    // ✅ Remove duplicate BRD titles inside editedBRD (keep the first/cover)
+    (() => {
+      const norm = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const hs = Array.from(iframeDoc.querySelectorAll("h1,h2,h3"));
+      const matches = hs.filter((h) => {
+        const t = norm(h.textContent);
+        return t === "business requirements document" || t === "business requirements document (brd)";
+      });
+      for (let i = 1; i < matches.length; i++) matches[i].remove();
+    })();
 
-    // ----------------------------
-    // Measure size + ensure full layout
-    // ----------------------------
-    iframe.style.height = Math.max(1200, iframeDoc.body.scrollHeight + 100) + "px";
+    // Ensure full height
+    iframe.style.height = Math.max(1200, iframeDoc.body.scrollHeight + 120) + "px";
     await new Promise((r) => setTimeout(r, 80));
 
-    const scrollHeight = iframeDoc.body.scrollHeight;
     const scrollWidth = iframeDoc.body.scrollWidth;
+    const scrollHeight = iframeDoc.body.scrollHeight;
     log("Content size:", `${scrollWidth}x${scrollHeight}px`);
 
-    // ----------------------------
     // Render full canvas
-    // ----------------------------
     const canvas = await html2canvas(iframeDoc.body, {
       scale: 2,
       useCORS: true,
@@ -1825,28 +1847,28 @@ async function generatePDF() {
       }
     });
 
-    if (!canvas || canvas.height === 0 || canvas.width === 0) throw new Error("Canvas is empty");
+    if (!canvas || canvas.width === 0 || canvas.height === 0) throw new Error("Canvas is empty");
 
     // ----------------------------
-    // Create PDF (SmartCut slicing)
+    // PDF pagination (SmartCut)
     // ----------------------------
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF("p", "mm", "a4");
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
     const margin = 10;
 
-    const printableW = pageWidth - margin * 2;
-    const printableH = pageHeight - margin * 2;
+    // ✅ Reserve space for footer so it never cuts content
+    const footerReserveMm = 14;
+    const printableW = pageW - margin * 2;
+    const printableH = pageH - margin * 2 - footerReserveMm;
 
     const pageSliceHpx = Math.floor(canvas.width * (printableH / printableW));
-    const maxPages = 12; // safety for 2–4 pages
+    const maxPages = 12;
 
     let y = 0;
-    const pages = []; // { imgData, sliceHmm }
-
-    log("Canvas px:", `${canvas.width}x${canvas.height}`, "Ideal sliceH:", `${pageSliceHpx}px`);
+    const pages = [];
 
     while (y < canvas.height) {
       if (pages.length >= maxPages) throw new Error("Pagination runaway (maxPages hit).");
@@ -1856,13 +1878,10 @@ async function generatePDF() {
       // last page
       if (remaining <= pageSliceHpx) {
         const sliceH = remaining;
-
         const pageCanvas = document.createElement("canvas");
         pageCanvas.width = canvas.width;
         pageCanvas.height = sliceH;
-
         pageCanvas.getContext("2d").drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-
         pages.push({
           imgData: pageCanvas.toDataURL("image/jpeg", 0.92),
           sliceHmm: (sliceH * printableW) / canvas.width
@@ -1872,15 +1891,21 @@ async function generatePDF() {
 
       // smart cut near ideal
       const idealCut = y + pageSliceHpx;
-      const cutY = findWhitespaceCutY(canvas, idealCut, 90, 15);
+      let cutY = findWhitespaceCutY(canvas, idealCut, 220, 25);
+
+      // clamp upward until cut line is definitely white (prevents half-line at top next page)
+      for (let i = 0; i < 320; i++) {
+        const yy = cutY - i;
+        if (yy <= y + 260) break; // avoid tiny pages
+        if (rowIsWhiteEnough(canvas, yy, 0.995)) { cutY = yy; break; }
+      }
 
       let sliceH = cutY - y;
-      if (sliceH < 240) sliceH = pageSliceHpx; // avoid tiny pages
+      if (sliceH < 260) sliceH = pageSliceHpx;
 
       const pageCanvas = document.createElement("canvas");
       pageCanvas.width = canvas.width;
       pageCanvas.height = sliceH;
-
       pageCanvas.getContext("2d").drawImage(canvas, 0, y, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
 
       pages.push({
@@ -1891,30 +1916,27 @@ async function generatePDF() {
       y += sliceH;
     }
 
-    // write pages + footer
+    // Write pages + footer
     const totalPages = pages.length;
     for (let i = 0; i < totalPages; i++) {
       if (i > 0) pdf.addPage();
       pdf.addImage(pages[i].imgData, "JPEG", margin, margin, printableW, pages[i].sliceHmm);
-      addFooter(pdf, i + 1, totalPages); // makes bottom whitespace look intentional
+      addFooter(pdf, i + 1, totalPages);
     }
 
     const pdfBlob = pdf.output("blob");
     log(`✅ PDF complete: ${totalPages} pages, ${(pdfBlob.size / 1024).toFixed(1)} KB`);
 
-    // ----------------------------
-    // Store results (same style as your original)
-    // ----------------------------
-    window.generatedBRD = window.generatedBRD || {};
+    // ✅ Like old: write to generatedBRD (submitBRD expects this)
     const service = String(collected.service || "Project").replace(/\s+/g, "-");
     const date = new Date().toISOString().split("T")[0];
     const filename = `BRD-${service}-${date}.pdf`;
 
-    window.generatedBRD.pdfBlob = pdfBlob;
-    window.generatedBRD.pdfBase64 = await blobToBase64(pdfBlob);
-    window.generatedBRD.pdfFilename = filename;
+    generatedBRD.pdfBlob = pdfBlob;
+    generatedBRD.pdfBase64 = await blobToBase64(pdfBlob);
+    generatedBRD.pdfFilename = filename;
 
-    // Auto-download (same behavior)
+    // Auto-download
     const url = URL.createObjectURL(pdfBlob);
     const a = document.createElement("a");
     a.href = url;
@@ -1931,6 +1953,7 @@ async function generatePDF() {
     log("Cleanup complete");
   }
 }
+
 
     async function sendBRDEmail(userEmail) {
       const collected = window.__vapiUi.collected;

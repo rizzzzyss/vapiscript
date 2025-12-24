@@ -1275,106 +1275,74 @@ async function generatePDF() {
 }
 
 async function generatePDF() {
-  const t0 = performance.now();
   const log = (...a) => console.log("%c[PDF]", "color:#0aa;font-weight:700", ...a);
 
-  try {
-    log("START");
+  if (typeof html2pdf === "undefined") throw new Error("html2pdf.js not loaded");
 
-    if (typeof html2pdf === "undefined") {
-      log("❌ html2pdf is undefined. Script not loaded.");
-      throw new Error("html2pdf.js not loaded");
+  const collected = window.__vapiUi?.collected || {};
+  const pdfContent = buildPDFContent();
+
+  const container = document.createElement("div");
+  container.id = "pdf-render-root";
+  container.innerHTML = pdfContent;
+
+  // ✅ ON-SCREEN (important) — not off-screen
+  container.style.cssText = `
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 800px;
+    background: #fff !important;
+    color: #111 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: none;
+    z-index: 2147483647;
+  `;
+  document.body.appendChild(container);
+
+  await new Promise(requestAnimationFrame);
+  await new Promise(r => setTimeout(r, 150));
+
+  const service = (collected.service || "Project").replace(/\s+/g, "-");
+  const date = new Date().toISOString().split("T")[0];
+  const filename = `BRD-${service}-${date}.pdf`;
+
+  try {
+    // ✅ CANVAS PREVIEW DEBUG (safe way)
+    const worker = html2pdf().set({
+      margin: [10, 10, 10, 10],
+      filename,
+      image: { type: "jpeg", quality: 0.95 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        foreignObjectRendering: true
+      },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+    }).from(container);
+
+    await worker.toCanvas();
+    const canvas = await worker.get("canvas");
+
+    // show preview
+    if (canvas) {
+      canvas.style.position = "fixed";
+      canvas.style.right = "10px";
+      canvas.style.bottom = "10px";
+      canvas.style.width = "240px";
+      canvas.style.border = "2px solid #0aa";
+      canvas.style.zIndex = "2147483647";
+      document.body.appendChild(canvas);
+      log("Canvas preview added. If it’s white, html2canvas is failing.");
     }
 
-    const collected = window.__vapiUi?.collected || {};
-    log("Collected keys:", Object.keys(collected));
+    // now generate PDF from SAME worker
+    const pdfBlob = await worker.outputPdf("blob");
+    log("✅ PDF blob size:", pdfBlob.size);
 
-    const pdfContent = buildPDFContent();
-    log("buildPDFContent length:", pdfContent?.length);
-
-    // Create container
-    const container = document.createElement("div");
-    container.id = "pdf-render-root";
-    container.innerHTML = pdfContent;
-
-    // Off-screen but VISIBLE (no opacity:0)
-    container.style.cssText = `
-      position:absolute;
-      left:-10000px;
-      top:0;
-      width:800px;
-      background:#fff !important;
-      color:#111 !important;
-      opacity:1 !important;
-      visibility:visible !important;
-      pointer-events:none;
-      z-index:999999;
-    `;
-
-    document.body.appendChild(container);
-
-    // Log container status
-    log("✅ Container appended:", !!document.getElementById("pdf-render-root"));
-    log("Container innerHTML length:", container.innerHTML.length);
-    log("Container rect:", container.getBoundingClientRect());
-
-    const cs = getComputedStyle(container);
-    log("Container computed:", {
-      display: cs.display,
-      opacity: cs.opacity,
-      visibility: cs.visibility,
-      background: cs.backgroundColor,
-      color: cs.color
-    });
-
-    // Give browser time to layout/paint
-    await new Promise(requestAnimationFrame);
-    await new Promise(r => setTimeout(r, 80));
-    log("After paint tick");
-
-    // Wait for images
-    const imgs = Array.from(container.querySelectorAll("img"));
-    log("Images found:", imgs.length);
-
-    await Promise.all(
-      imgs.map((img, i) => new Promise(res => {
-        const done = (status) => {
-          log(`IMG[${i}] ${status}`, {
-            src: img.currentSrc || img.src,
-            complete: img.complete,
-            naturalWidth: img.naturalWidth,
-            naturalHeight: img.naturalHeight
-          });
-          res();
-        };
-        if (img.complete && img.naturalWidth > 0) return done("already-loaded");
-        img.addEventListener("load", () => done("loaded"), { once: true });
-        img.addEventListener("error", () => done("error"), { once: true });
-      }))
-    );
-
-    // Filename
-    const service = (collected.service || "Project").replace(/\s+/g, "-");
-    const date = new Date().toISOString().split("T")[0];
-    const filename = `BRD-${service}-${date}.pdf`;
-    log("Filename:", filename);
-
-    // Generate PDF
-    log("Generating PDF...");
-    const pdfBlob = await html2pdf()
-      .set({
-        margin: [10, 10, 10, 10],
-        filename,
-        image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, allowTaint: true },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-      })
-      .from(container)
-      .outputPdf("blob");
-
-    log("✅ PDF blob:", { size: pdfBlob.size, type: pdfBlob.type });
-
-    // Convert to base64
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result.split(",")[1]);
@@ -1382,25 +1350,17 @@ async function generatePDF() {
       reader.readAsDataURL(pdfBlob);
     });
 
-    log("✅ Base64 length:", base64.length);
-
-    // Store for email/download
     generatedBRD.pdfBlob = pdfBlob;
     generatedBRD.pdfBase64 = base64;
     generatedBRD.pdfFilename = filename;
 
-    log("DONE in ms:", Math.round(performance.now() - t0));
     return { blob: pdfBlob, base64, filename };
-
-  } catch (err) {
-    console.error("[PDF] ❌ ERROR:", err);
-    throw err;
   } finally {
-    const el = document.getElementById("pdf-render-root");
-    if (el) el.remove();
-    console.log("%c[PDF] CLEANUP done", "color:#999");
+    // TEMP: comment this out while debugging so you can inspect DOM
+    // container.remove();
   }
 }
+
 
 
     async function sendBRDEmail(userEmail) {

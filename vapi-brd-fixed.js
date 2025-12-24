@@ -1078,7 +1078,7 @@
       const collected = window.__vapiUi.collected;
       const container = document.createElement('div');
       container.innerHTML = pdfContent;
-      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px';
+container.style.cssText = 'position:fixed;left:0;top:0;width:800px;background:#fff;z-index:-1;opacity:0;pointer-events:none;';
       document.body.appendChild(container);
       
       const service = (collected.service || 'Project').replace(/\s+/g, '-');

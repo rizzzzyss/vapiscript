@@ -1131,7 +1131,7 @@ function buildPDFContent() {
 }
 
 
-async function generatePDF() {
+/*async function generatePDF() {
   const log = (...a) => console.log("%c[PDF]", "color:#0aa;font-weight:700", ...a);
   const err = (...a) => console.error("%c[PDF]", "color:#f00;font-weight:700", ...a);
 
@@ -1316,8 +1316,220 @@ async function generatePDF() {
     iframe.remove();
     log("Cleanup complete");
   }
-}
+}*/
+async function generatePDF() {
+  const log = (...a) => console.log("%c[PDF]", "color:#0aa;font-weight:700", ...a);
+  const err = (...a) => console.error("%c[PDF]", "color:#f00;font-weight:700", ...a);
 
+  log("========== PDF GENERATION START ==========");
+
+  // ✅ Ensure jsPDF is loaded
+  if (!window.jspdf?.jsPDF) {
+    log("Loading jsPDF...");
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      script.onload = () => {
+        log("jsPDF loaded successfully");
+        resolve();
+      };
+      script.onerror = () => reject(new Error("Failed to load jsPDF"));
+      document.head.appendChild(script);
+    });
+  }
+
+  // ✅ Ensure html2canvas is loaded
+  if (typeof html2canvas === "undefined") {
+    log("Loading html2canvas...");
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      script.onload = () => {
+        log("html2canvas loaded successfully");
+        resolve();
+      };
+      script.onerror = () => reject(new Error("Failed to load html2canvas"));
+      document.head.appendChild(script);
+    });
+  }
+
+  log("✅ All libraries loaded");
+
+  const collected = window.__vapiUi?.collected || {};
+  const pdfContent = buildPDFContent();
+  
+  log("Content length:", pdfContent?.length || 0);
+
+  // Create iframe to isolate from parent page styles
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = `
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 850px;
+    height: 1200px;
+    border: none;
+    background: #fff;
+    z-index: 999999;
+  `;
+  document.body.appendChild(iframe);
+
+  await new Promise(r => setTimeout(r, 100));
+
+  const iframeDoc = iframe.contentDocument;
+  iframeDoc.open();
+  iframeDoc.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+          font-family: Arial, sans-serif; 
+          padding: 40px;
+          background: #fff;
+          color: #333;
+          line-height: 1.6;
+          overflow: visible;
+        }
+        h1, h2, h3 { page-break-inside: avoid; }
+        img { max-width: 100%; page-break-inside: avoid; }
+        div { page-break-inside: auto; }
+      </style>
+    </head>
+    <body>${pdfContent}</body>
+    </html>
+  `);
+  iframeDoc.close();
+
+  // Wait for iframe to fully render
+  await new Promise(resolve => {
+    iframe.onload = () => resolve();
+    setTimeout(resolve, 300);
+  });
+
+  try {
+    // Wait for all images to load to prevent layout shifts
+    log("Waiting for images...");
+    const images = iframeDoc.querySelectorAll('img');
+    await Promise.all(Array.from(images).map(img => {
+      return new Promise((resolve) => {
+        if (img.complete) resolve();
+        else img.onload = () => resolve();
+        img.onerror = () => resolve(); // Resolve even on error
+      });
+    }));
+    log("✅ All images loaded");
+
+    // Ensure iframe renders at full content height
+    iframe.style.height = 'auto';
+    iframe.style.width = '850px';
+    iframeDoc.body.style.minHeight = 'auto';
+    iframeDoc.body.style.overflow = 'visible';
+
+    // Force reflow
+    const scrollHeight = iframeDoc.body.scrollHeight;
+    const scrollWidth = iframeDoc.body.scrollWidth;
+    log("Content dimensions:", scrollWidth, "x", scrollHeight);
+
+    // Generate canvas with exact dimensions
+    log("Generating canvas...");
+    const canvas = await html2canvas(iframeDoc.body, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: scrollWidth,
+      height: scrollHeight,
+      windowWidth: scrollWidth,
+      windowHeight: scrollHeight,
+      onclone: (clonedDoc) => {
+        clonedDoc.body.style.overflow = 'visible';
+        clonedDoc.body.style.position = 'static';
+      }
+    });
+
+    log("Canvas size:", canvas.width, "x", canvas.height);
+
+    if (canvas.height === 0) {
+      throw new Error("Canvas height is 0 - content not rendered");
+    }
+
+    log("Creating PDF...");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+    const imgHeight = (canvas.height * contentWidth) / canvas.width;
+
+    // Pagination loop - FIXED to prevent cutting
+    let heightLeft = imgHeight;
+    let position = margin; // Start at top margin
+    let page = 1;
+
+    // Add first page
+    pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, imgHeight);
+    heightLeft -= (pageHeight - margin * 2);
+    log("Page", page, "added - Height left:", heightLeft);
+
+    // Add remaining pages
+    while (heightLeft > 0) {
+      pdf.addPage();
+      page++;
+      
+      // Move canvas UP to show next portion (negative position)
+      position = -(imgHeight - heightLeft - margin);
+      
+      pdf.addImage(imgData, 'JPEG', margin, position, contentWidth, imgHeight);
+      heightLeft -= (pageHeight - margin * 2);
+      log("Page", page, "added - Position:", position, "Height left:", heightLeft);
+    }
+
+    // Generate final PDF
+    const pdfBlob = pdf.output('blob');
+    log("✅ PDF created - Size:", pdfBlob.size, "bytes");
+
+    if (pdfBlob.size < 5000) {
+      throw new Error("PDF too small (< 5KB)");
+    }
+
+    // Convert to base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(pdfBlob);
+    });
+
+    // Store results
+    const service = (collected.service || "Project").replace(/\s+/g, "-");
+    const date = new Date().toISOString().split("T")[0];
+    const filename = `BRD-${service}-${date}.pdf`;
+
+    generatedBRD.pdfBlob = pdfBlob;
+    generatedBRD.pdfBase64 = base64;
+    generatedBRD.pdfFilename = filename;
+
+    log("✅ PDF generation successful!");
+    log("========== PDF SUCCESS ==========");
+
+    return { blob: pdfBlob, base64, filename };
+
+  } catch (error) {
+    err("PDF generation failed:", error.message);
+    throw error;
+
+  } finally {
+    // Clean up iframe
+    iframe.remove();
+    log("Cleanup complete");
+  }
+}
 
     async function sendBRDEmail(userEmail) {
       const collected = window.__vapiUi.collected;

@@ -1208,7 +1208,7 @@ container.style.cssText = 'position:fixed;left:0;top:0;width:800px;background:#f
       getCollected: () => window.__vapiUi.collected,
       getGeneratedBRD: () => generatedBRD,
       getBRDMode: () => inBRDMode,
-      unlockBRDMode: () => { inBRDMode = false; if (closeBtn) closeBtn.style.display = ''; console.log("BRD mode unlocked"); }
+      unlockBRDMode: () => { inBRDMode = false; if (closeBtn) closeBtn.style.display = ''; console.log("BRD mode unlocked"); },
       testPDFContent: () => buildPDFContent()  
     };
 

@@ -49,7 +49,8 @@
     const GEMINI_WORKER_URL = "https://geminiworker.rizwin.workers.dev"; 
     const RESEND_WORKER_URL = "https://resendworker.rizwin.workers.dev"; 
     const WORKER_SECRET = "xK9#mP2$vL5nQ8wR"; // Set if you configured WORKER_SECRET in your workers
-    
+    const BRD_PDF_WORKER_URL = "https://brd-pdf-link.rizwin.workers.dev";
+
     const ADMIN_EMAIL = "rizwinazeez@gmail.com";
     
     const BRD_CONFIG = {
@@ -1972,31 +1973,50 @@ function buildPDFContent() {
       return await response.json();
     }
 */
-    async function submitBRD() {
-      const userEmail = brdEmailInput?.value?.trim();
-      if (!userEmail || !userEmail.includes('@')) { alert('Please enter a valid email'); brdEmailInput?.focus(); return; }
-      
-      if (brdSubmitBtn) {
-        brdSubmitBtn.disabled = true;
-        const submitText = brdSubmitBtn.querySelector('.submit-text');
-        if (submitText) submitText.textContent = "Generating PDF...";
-      }
-      
-      try {
-        await generatePDF();
-        if (brdSubmitBtn) { const t = brdSubmitBtn.querySelector('.submit-text'); if (t) t.textContent = "Sending email..."; }
-        await sendBRDEmail(userEmail);
-        showSuccessScreen(userEmail);
-      } catch (error) {
-        console.error('[Submit BRD Error]', error);
-        alert('Failed to submit BRD: ' + error.message);
-        if (brdSubmitBtn) {
-          brdSubmitBtn.disabled = false;
-          const t = brdSubmitBtn.querySelector('.submit-text');
-          if (t) t.textContent = "Submit & Send BRD";
-        }
-      }
+async function submitBRD() {
+  const userEmail = brdEmailInput?.value?.trim();
+  if (!userEmail || !userEmail.includes('@')) { 
+    alert('Please enter a valid email'); 
+    brdEmailInput?.focus();
+    return; 
+  }
+  
+  if (brdSubmitBtn) {
+    brdSubmitBtn.disabled = true;
+    const submitText = brdSubmitBtn.querySelector('.submit-text');
+    if (submitText) submitText.textContent = "Generating & Sending...";
+  }
+  
+  try {
+    const pdfHtml = buildPDFContent();
+    
+    const response = await fetch(`${BRD_PDF_WORKER_URL}/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userEmail: userEmail,
+        pdfHtml: pdfHtml
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to send BRD");
     }
+    
+    showSuccessScreen(userEmail);
+    
+  } catch (error) {
+    console.error('[Submit BRD Error]', error);
+    alert('Failed: ' + error.message);
+    if (brdSubmitBtn) {
+      brdSubmitBtn.disabled = false;
+      const t = brdSubmitBtn.querySelector('.submit-text');
+      if (t) t.textContent = "Submit & Send BRD";
+    }
+  }
+}
 
     function showSuccessScreen(userEmail) {
       if (successEmail) successEmail.innerHTML = `<p>📧 Sent to: <strong>${escapeHtml(userEmail)}</strong></p><p>📧 Copy to: <strong>${escapeHtml(ADMIN_EMAIL)}</strong></p>`;

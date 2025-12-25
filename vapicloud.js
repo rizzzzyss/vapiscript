@@ -1074,7 +1074,7 @@
   return content;
 }*/
 
-    function stripHtmlWrapper(html) {
+  /*  function stripHtmlWrapper(html) {
   if (!html) return "";
   let content = html;
   content = content.replace(/<!DOCTYPE[^>]*>/gi, "");
@@ -1087,7 +1087,25 @@
   content = content.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "");
   content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
   return content.trim();
+}*/
+    function stripHtmlWrapper(html) {
+  if (!html) return "";
+  let content = html;
+  content = content.replace(/<!DOCTYPE[^>]*>/gi, "");
+  content = content.replace(/<html[^>]*>/gi, "");
+  content = content.replace(/<\/html>/gi, "");
+  content = content.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
+  content = content.replace(/<body[^>]*>/gi, "");
+  content = content.replace(/<\/body>/gi, "");
+  content = content.replace(/<meta[^>]*>/gi, "");
+  content = content.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "");
+  // Remove Gemini's BRD header (keep your custom one)
+  content = content.replace(/<h1[^>]*>[\s\S]*?Business Requirements Document[\s\S]*?<\/h1>/gi, "");
+  content = content.replace(/<p[^>]*>\s*<strong>\s*Project:\s*<\/strong>[\s\S]*?<\/p>/gi, "");
+  content = content.replace(/<p[^>]*>\s*<strong>\s*Date:\s*<\/strong>[\s\S]*?<\/p>/gi, "");
+  return content.trim();
 }
+
     function buildPDFContent() {
   const collected = window.__vapiUi.collected || {};
   const today = new Date().toLocaleDateString("en-US", {

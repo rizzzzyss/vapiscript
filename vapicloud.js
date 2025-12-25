@@ -178,6 +178,20 @@
       pdfFilename: null
     };
 
+ const vapiCallBtn = document.getElementById("vapiCallBtn");
+  const vapiBtnIcon = document.getElementById("vapiBtnIcon");
+  const vapiTooltip = document.getElementById("vapiTooltip");
+      // ✅ Make the button feel like "AI Voice" (not phone call)
+  if (vapiBtnIcon) {
+    vapiBtnIcon.innerHTML = `
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+        <path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>
+      </svg>
+    `;
+  }
+  if (vapiTooltip) vapiTooltip.textContent = "Talk to Rizwin AI (Voice)";
+
+
     // ============================================
     // STATUS INDICATOR FUNCTIONS
     // ============================================

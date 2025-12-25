@@ -191,7 +191,12 @@
   }
   if (vapiTooltip) vapiTooltip.textContent = "Talk to Rizwin AI (Voice)";
 
+const wrap = document.getElementById("vapi-ws-pill");
+const btn  = document.getElementById("vapiCallBtn");
 
+btn?.addEventListener("click", () => {
+  wrap?.classList.add("is-open");
+});
     // ============================================
     // STATUS INDICATOR FUNCTIONS
     // ============================================

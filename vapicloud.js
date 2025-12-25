@@ -1642,7 +1642,7 @@ function buildPDFContent() {
    - Removes duplicate BRD headings safely (keep first)
    ============================================= */
 
-async function generatePDF() {
+/*async function generatePDF() {
   const log = (...a) => console.log("%c[PDF]", "color:#0aa;font-weight:700", ...a);
   const err = (...a) => console.error("%c[PDF]", "color:#f00;font-weight:700", ...a);
 
@@ -1952,10 +1952,10 @@ async function generatePDF() {
     iframe.remove();
     log("Cleanup complete");
   }
-}
+}*/
 
 
-    async function sendBRDEmail(userEmail) {
+  /*  async function sendBRDEmail(userEmail) {
       const collected = window.__vapiUi.collected;
       const projectSummary = {};
       Object.entries(collected).forEach(([key, value]) => { if (value) projectSummary[key] = Array.isArray(value) ? value.join(', ') : value; });
@@ -1971,7 +1971,7 @@ async function generatePDF() {
       if (!response.ok) { const error = await response.json().catch(() => ({})); throw new Error(error?.error || 'Failed to send email'); }
       return await response.json();
     }
-
+*/
     async function submitBRD() {
       const userEmail = brdEmailInput?.value?.trim();
       if (!userEmail || !userEmail.includes('@')) { alert('Please enter a valid email'); brdEmailInput?.focus(); return; }

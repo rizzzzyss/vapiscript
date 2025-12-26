@@ -1,0 +1,2117 @@
+:root {
+  --cta-size: 60px;
+  --cta-right: 16px;
+  --cta-left: 16px;
+  --cta-bottom: 34px;
+  --cta-icon-size: 32px;
+  --ht-stroke: rgba(255, 215, 90, 0.20);
+    --ht-cardTop: rgba(18, 18, 18, 0.58);
+    --ht-cardBot: rgba(10, 10, 10, 0.38);
+    --ht-text: rgba(255,255,255,0.92);
+    --ht-sub: rgba(255,255,255,0.68);
+    --ht-z: 999999;
+}
+  
+  .vapi-ai-wrapper{
+  position: fixed;
+  bottom: 34px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 999999;
+}
+
+.vapi-ai-label{
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,.95);
+  letter-spacing: .3px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.15);
+  padding: 6px 14px;
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  user-select: none;
+  transition: all .3s ease;
+}
+
+.vapi-ai-label:hover{
+  background: rgba(255,255,255,.14);
+  transform: translateY(-1px);
+}
+  
+
+/* ✅ Bigger + perfectly centered + more above */
+#vapi-ws-pill .vapi-ai-label{
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 16px);   /* <-- higher (was 10px) */
+  transform: translateX(-50%);
+
+  padding: 10px 18px;          /* <-- bigger pill */
+  border-radius: 999px;
+
+  font-size: 15px;             /* <-- bigger text */
+  font-weight: 800;
+  letter-spacing: .2px;
+  white-space: nowrap;
+
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 14px 34px rgba(0,0,0,.38);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+
+  pointer-events: none;
+}
+
+#vapi-ws-pill.is-open .vapi-ai-label{
+  opacity: 0;
+  transform: translateX(-50%) translateY(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+
+ #vapiOverlay.is-open {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
+
+/* Contain the card */
+#vapiCard {
+  position: relative !important;
+  max-height: 90vh !important;
+  overflow: hidden !important;
+  contain: layout style !important;
+}
+
+/* BRD Screen containment */
+#vapiScreenBRD {
+  position: relative !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  contain: layout style paint !important;
+}
+
+/* BRD container isolation */
+.vapi-brd-container {
+  position: relative !important;
+  max-height: 75vh !important;
+  overflow-y: auto !important;
+  contain: layout !important;
+}
+
+/* Isolate BRD editor content */
+.vapi-brd-editor {
+  position: relative !important;
+  max-height: 300px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  contain: layout style !important;
+  isolation: isolate !important;
+}
+
+/* Prevent BRD content from leaking styles */
+.vapi-brd-editor * {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
+.vapi-brd-editor img {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+}
+
+/* Prevent body from collapsing */
+body {
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+}
+
+body.vapi-overlay-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+} 
+  
+  /* ============================================ */
+/* CRITICAL: HIDE NEW SCREENS BY DEFAULT */
+/* ============================================ */
+
+#vapiScreenLoading,
+#vapiScreenBRD,
+#vapiScreenSuccess {
+  display: none !important;
+}
+
+#vapiScreenLoading.is-active {
+  display: flex !important;
+}
+
+#vapiScreenBRD.is-active {
+  display: block !important;
+}
+
+#vapiScreenSuccess.is-active {
+  display: flex !important;
+}
+  
+  
+/* ============================================= */
+/* HAND TOGGLE - LOADING STATE                   */
+/* ============================================= */
+#hand-toggle.loading {
+  opacity: 0.7 !important;
+  pointer-events: none !important;
+  animation: none !important;
+}
+
+#hand-toggle.loading::before {
+  content: '' !important;
+  position: absolute !important;
+  width: 24px !important;
+  height: 24px !important;
+  border: 3px solid rgba(255, 255, 255, 0.3) !important;
+  border-top-color: #fff !important;
+  border-radius: 50% !important;
+  animation: htSpinner 0.8s linear infinite !important;
+}
+
+#hand-toggle.loading::after {
+  display: none !important;
+}
+
+@keyframes htSpinner {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================= */
+/* HAND STATUS - SMOOTH TRANSITIONS              */
+/* ============================================= */
+#hand-status {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  background: rgba(0, 0, 0, 0.95) !important;
+  color: white !important;
+  padding: 25px 40px !important;
+  border-radius: 16px !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  z-index: 99999999 !important;
+  display: none;
+  border: 2px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6) !important;
+  text-align: center !important;
+  max-width: 90vw !important;
+  transition: background 0.3s ease, opacity 0.3s ease;
+}
+
+#hand-status.loading {
+  animation: htStatusPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes htStatusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+  #htTourWrap{ position:fixed; inset:0; display:none; z-index:var(--ht-z); }
+  #htTourWrap.is-open{ display:block; }
+  #htTourBackdrop{
+    position:absolute; inset:0;
+    background:
+      radial-gradient(900px 520px at 70% 80%, rgba(255,200,50,0.08), transparent 60%),
+      rgba(0,0,0,0.18);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  #htTourCard{
+    position:absolute; right:18px; bottom:120px;
+    width:min(420px, calc(100vw - 36px));
+    border-radius:20px;
+    border:1px solid var(--ht-stroke);
+    background:linear-gradient(180deg, var(--ht-cardTop), var(--ht-cardBot));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow:0 22px 70px rgba(0,0,0,0.62), 0 0 45px rgba(255,200,50,0.10);
+    overflow:hidden;
+    transform: translateY(10px);
+    opacity:0;
+    transition: transform .22s ease, opacity .22s ease;
+  }
+  #htTourWrap.is-open #htTourCard{ transform: translateY(0); opacity:1; }
+
+  .htTourTop{ display:flex; align-items:center; gap:12px; padding:14px 14px 10px; border-bottom:1px solid rgba(255,255,255,0.10); }
+  .htTourIcon{ width:40px; height:40px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.10); font-size:20px; }
+  .htTourHead{ flex:1; min-width:0; }
+  .htTourTitle{ color:var(--ht-text); font:800 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+  .htTourSub{ margin-top:2px; color:var(--ht-sub); font:600 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+  .htTourClose{ width:34px; height:34px; border-radius:12px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.08); color:var(--ht-text); cursor:pointer; }
+
+  .htTourBody{ padding:12px 14px 14px; }
+  .htTourSteps{ display:grid; gap:10px; }
+  .htStep{ display:flex; align-items:flex-start; gap:10px; padding:10px; border-radius:16px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.10); }
+  .htStep.is-active{ background:rgba(255,200,50,0.10); border-color:rgba(255,200,50,0.22); box-shadow:0 0 26px rgba(255,200,50,0.14); }
+  .htStepNum{ width:28px; height:28px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.10); color:var(--ht-text); font:800 13px/1 system-ui; }
+  .htStepTitle{ color:var(--ht-text); font:800 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+  .htStepDesc{ margin-top:3px; color:var(--ht-sub); font:600 12px/1.35 system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+  .htStepStatus{ color:rgba(255,255,255,0.75); font:700 11px/1 system-ui; padding:7px 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.14); background:rgba(0,0,0,0.12); white-space:nowrap; }
+
+  .htTourActions{ display:flex; gap:10px; margin-top:12px; }
+  .htBtnPrimary{ flex:1; padding:11px 12px; border-radius:14px; border:1px solid rgba(255,200,50,0.25); background:linear-gradient(135deg, rgba(255,200,50,0.85), rgba(255,140,0,0.40)); color:#0b0b0f; font:900 13px/1 system-ui; cursor:pointer; }
+  .htBtnGhost{ padding:11px 12px; border-radius:14px; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.08); color:var(--ht-text); font:800 13px/1 system-ui; cursor:pointer; }
+
+  .htTourMeta{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; }
+  .htCheck{ display:flex; align-items:center; gap:8px; color:rgba(255,255,255,0.72); font:600 12px/1 system-ui; }
+  .htHelpToggle{ border:none; background:transparent; color:rgba(255,215,90,0.90); font:800 12px/1 system-ui; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  .htHelp{ margin-top:10px; padding:10px 12px; border-radius:16px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.78); font:650 12px/1.35 system-ui; }
+  .htHelpItem{ margin:6px 0; }
+
+  @media (max-width: 480px){
+    #htTourCard{ right:12px; left:12px; width:auto; bottom:110px; }
+  }
+.topbar{
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 18px;
+  z-index: 9999999;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  background: rgba(0,0,0,.55);
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  backdrop-filter: blur(8px);
+}
+
+.topbar-inner{
+  width:min(1100px, 96vw);
+  display:flex;
+  justify-content:center;
+}
+.w-nav, .navbar { margin-top: var(--topbar-h); }
+.section-hero, .hero, header { padding-top: var(--topbar-h); }
+.w-nav, .navbar{
+  top: var(--topbar-h) !important;
+}
+
+/* === TABLET (768px) === */
+@media (max-width: 768px) {
+  :root {
+    --cta-size: 56px;
+    --cta-right: 14px;
+    --cta-left: 14px;
+    --cta-bottom: 28px;
+    --cta-icon-size: 30px;
+  }
+}
+
+/* === MOBILE (520px) === */
+@media (max-width: 520px) {
+  :root {
+    --cta-size: 52px;
+    --cta-right: 12px;
+    --cta-left: 12px;
+    --cta-bottom: 20px;
+    --cta-icon-size: 28px;
+  }
+}
+
+/* === SMALL MOBILE (380px) === */
+@media (max-width: 380px) {
+  :root {
+    --cta-size: 48px;
+    --cta-right: 10px;
+    --cta-left: 10px;
+    --cta-bottom: 16px;
+    --cta-icon-size: 24px;
+  }
+}
+
+/* ============================================= */
+/* WHATSAPP FLOAT BUTTON                         */
+/* ============================================= */
+.wa-float {
+  position: fixed;
+  width: var(--cta-size);
+  height: var(--cta-size);
+  right: var(--cta-right);
+  bottom: var(--cta-bottom);
+  border-radius: 50%;
+  background: #25D366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
+  animation: wa-pulse 2s infinite;
+}
+
+.wa-float img { 
+  width: var(--cta-icon-size); 
+  height: var(--cta-icon-size); 
+  display: block; 
+}
+
+@keyframes wa-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.6); }
+  70% { box-shadow: 0 0 0 18px rgba(37, 211, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+
+/* ============================================= */
+/* VAPI CALL BUTTON                              */
+/* ============================================= */
+#vapi-ws-pill {
+  position: fixed;
+  z-index: 999999;
+  bottom: var(--cta-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+#vapiCallBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cta-size);
+  height: var(--cta-size);
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  transition: transform 0.12s ease, background 0.25s ease;
+  animation: vapi-pulse-ring 2s infinite;
+  background: rgb(37, 211, 102);
+}
+
+#vapiBtnIcon {
+  width: var(--cta-icon-size);
+  height: var(--cta-icon-size);
+  filter: invert(1) brightness(2);
+}
+
+@keyframes vapi-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(37, 211, 102, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+}
+
+@keyframes vapi-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+  
+/* 
+  #vapi-ws-pill {
+  position: fixed;
+  z-index: 999999;
+  bottom: var(--cta-bottom);
+  left: 50%;
+  transform: translateX(-50%);
+}
+#vapiCallBtn{
+  position: relative;
+  width: var(--cta-size);
+  height: var(--cta-size);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,.15);
+  box-shadow:
+    0 0 20px rgba(0,255,160,.35),
+    inset 0 1px 0 rgba(255,255,255,.25);
+  background: radial-gradient(circle at 30% 30%, rgba(0,255,160,.25), rgba(0,255,120,.05) 70%, rgba(255,255,255,.05) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: vapiBlink 2s ease-in-out infinite;
+  transition: transform .25s ease;
+}
+
+#vapiCallBtn:hover{
+  transform: scale(1.05);
+}
+
+.vapi-glass{
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,.25) 0%, rgba(255,255,255,0) 70%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.vapi-text{
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  user-select: none;
+  pointer-events: none;
+}
+
+
+@keyframes vapiBlink {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0,255,160,.35),
+                inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  50% {
+    box-shadow: 0 0 38px rgba(0,255,160,.9),
+                inset 0 1px 0 rgba(255,255,255,.25);
+  }
+}
+  */
+/* ============================================= */
+/* HAND TOGGLE BUTTON                            */
+/* ============================================= */
+@keyframes pulse-ring-hand {
+  0% { box-shadow: 0 0 0 0 rgba(255, 165, 50, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(255, 165, 50, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 165, 50, 0); }
+}
+
+@keyframes bounce-arrow {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(8px); }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+#hand-toggle {
+  position: fixed;
+  bottom: var(--cta-bottom);
+  left: var(--cta-left);
+  z-index: 99997;
+  width: var(--cta-size) !important;
+  height: var(--cta-size) !important;
+  min-width: unset !important;
+  max-width: unset !important;
+  padding: 0 !important;
+  border: none;
+  border-radius: 50% !important;
+  cursor: pointer;
+  background: rgb(255, 165, 50) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  animation: pulse-ring-hand 2s infinite;
+}
+
+#hand-toggle:hover {
+  transform: scale(1.1);
+}
+
+#hand-toggle > *,
+#hand-toggle div,
+#hand-toggle span {
+  display: none !important;
+}
+
+#hand-toggle::before {
+  content: '✋';
+  font-size: calc(var(--cta-icon-size) - 6px);
+  display: block !important;
+}
+
+#hand-toggle::after {
+  content: 'Control Me ↓';
+  position: absolute;
+  bottom: calc(var(--cta-size) + 15px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: rgb(255, 185, 80);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 2px solid rgba(255, 165, 50, 0.5);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+  animation: bounce-arrow 1.5s ease-in-out infinite;
+}
+
+#hand-toggle.active {
+  background: rgb(255, 0, 0) !important;
+  animation: none;
+}
+
+#hand-toggle.active::before {
+  content: '✖';
+  font-size: calc(var(--cta-icon-size) - 8px);
+  color: white;
+}
+
+#hand-toggle.active::after {
+  display: none;
+}
+
+/* Hide tooltip on tablet and mobile */
+@media (max-width: 768px) {
+  #hand-toggle::after {
+    display: none;
+  }
+}
+
+/* ============================================= */
+/* iPHONE SAFE AREA - ALL BUTTONS               */
+/* ============================================= */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .wa-float,
+  #vapi-ws-pill,
+  #hand-toggle,
+  .vapi-status-indicator {
+    bottom: calc(var(--cta-bottom) + env(safe-area-inset-bottom));
+  }
+}
+
+/* ============================================= */
+/* TOOLTIP                                       */
+/* ============================================= */
+.vapi-tooltip {
+  position: fixed;
+  bottom: calc(var(--cta-bottom) + var(--cta-size) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111;
+  color: white;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 999998;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.vapi-tooltip-arrow {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #111;
+}
+
+/* Hide tooltip when call is active */
+body.vapi-call-active #vapiTooltip {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+/* ============================================= */
+/* STATUS INDICATOR - NEW SMART STATES           */
+/* ============================================= */
+.vapi-status-indicator {
+  position: fixed;
+  bottom: calc(var(--cta-bottom) + var(--cta-size) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 12px;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  z-index: 999998;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+/* State: Listening (waiting for user) - GREEN */
+.vapi-status-indicator.state-listening {
+  background: rgba(37, 211, 102, 0.95);
+  color: white;
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* State: User Speaking - BLUE */
+.vapi-status-indicator.state-user-speaking {
+  background: rgba(59, 130, 246, 0.95);
+  color: white;
+  animation: userSpeakingPulse 0.5s ease-in-out infinite;
+}
+
+/* State: AI Speaking - PURPLE */
+.vapi-status-indicator.state-ai-speaking {
+  background: rgba(139, 92, 246, 0.95);
+  color: white;
+  animation: aiSpeakingWave 1s ease-in-out infinite;
+}
+
+/* State: Idle/Waiting (no activity) - AMBER */
+.vapi-status-indicator.state-idle {
+  background: rgba(251, 191, 36, 0.95);
+  color: #1a1a1a;
+  animation: idleBounce 1.5s ease-in-out infinite;
+}
+
+/* State: Connecting - GRAY */
+.vapi-status-indicator.state-connecting {
+  background: rgba(107, 114, 128, 0.95);
+  color: white;
+}
+
+/* Icon container */
+.vapi-status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+.vapi-status-icon svg {
+  flex-shrink: 0;
+}
+
+/* Status Indicator Animations */
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.8; transform: translateX(-50%) scale(0.98); }
+}
+
+@keyframes userSpeakingPulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 4px 24px rgba(59, 130, 246, 0.6); }
+}
+
+@keyframes aiSpeakingWave {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.02); }
+}
+
+@keyframes idleBounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-3px); }
+}
+
+/* ============================================= */
+/* OVERLAY & CARD - GLASSMORPHISM               */
+/* ============================================= */
+#vapiOverlay { 
+  display: none; 
+  position: fixed; 
+  inset: 0; 
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 999999;
+  align-items: center;
+  justify-content: center;
+  /* Smart padding with safe area */
+  padding: clamp(10px, 3vw, 18px);
+  padding-bottom: calc(clamp(10px, 3vw, 18px) + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+
+#vapiOverlay.is-open { 
+  display: flex; 
+}
+
+#vapiCard {
+  /* Dynamic width - never overflows */
+  width: min(720px, calc(100vw - clamp(20px, 4vw, 36px)));
+  
+  /* Dynamic height - always fits with room to breathe */
+  max-height: calc(100vh - clamp(40px, 8vh, 80px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  max-height: calc(100dvh - clamp(40px, 8vh, 80px) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  
+  /* Dynamic padding */
+  padding: clamp(14px, 3vw, 24px);
+  
+  /* Dynamic border radius */
+  border-radius: clamp(16px, 3vw, 24px);
+  
+  /* Enable scrolling */
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  /* Prevent content overflow */
+  box-sizing: border-box;
+  
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color: #fff;
+}
+
+/* === Screen show/hide === */
+.vapi-screen { 
+  display: none; 
+}
+
+.vapi-screen.is-active { 
+  display: block; 
+}
+
+/* === Header === */
+.vapi-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.vapi-title { 
+  font-size: clamp(16px, 4vw, 20px); 
+  font-weight: 900; 
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.vapi-sub { 
+  font-size: clamp(12px, 3vw, 14px); 
+  font-weight: 600; 
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.vapi-head-actions { 
+  display: flex; 
+  gap: 8px; 
+}
+
+/* === Glass Buttons === */
+.vapi-ghost {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.vapi-ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.vapi-primary {
+  border: none;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.9), rgba(255, 200, 87, 0.9));
+  color: #000;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+}
+
+.vapi-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+}
+
+.vapi-primary:disabled { 
+  opacity: .4; 
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* === Grid + Glass Cards === */
+.vapi-grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr)); 
+  gap: clamp(8px, 2vw, 12px); 
+}
+
+.vapi-opt, 
+.vapi-cardbtn {
+  width: 100%;
+  padding: clamp(14px, 3vw, 18px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.vapi-cardbtn:hover,
+.vapi-opt:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.vapi-cardbtn.is-selected,
+.vapi-opt.is-selected {
+  background: rgba(212, 175, 55, 0.3);
+  border-color: rgba(212, 175, 55, 0.8);
+  color: #fff;
+  box-shadow: 
+    0 0 20px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* === Footer === */
+.vapi-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.vapi-muted { 
+  font-size: 13px; 
+  font-weight: 600; 
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* === Question Box === */
+.vapi-qbox { 
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px; 
+  padding: 20px;
+}
+
+.vapi-q { 
+  font-weight: 900; 
+  margin-bottom: 14px; 
+  color: #fff;
+  font-size: 16px;
+}
+
+.vapi-input {
+  width: 100%;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  outline: none;
+  color: #fff;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.vapi-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.vapi-input:focus {
+  border-color: rgba(212, 175, 55, 0.8);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* === Preview === */
+.vapi-preview { 
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px; 
+  padding: 20px;
+}
+
+.vapi-preview-head {
+  margin-bottom: 12px;
+}
+
+.vapi-preview-head > div:first-child {
+  color: #fff;
+  font-weight: 900;
+}
+
+.vapi-preview-html { 
+  margin-top: 12px; 
+  max-height: 45vh; 
+  overflow: auto; 
+  padding: 16px; 
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px; 
+  color: #fff;
+}
+
+/* Style the preview content rows */
+.vapi-preview-html > div > div {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* === Scrollbar for glass effect === */
+.vapi-preview-html::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vapi-preview-html::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.vapi-preview-html::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.vapi-preview-html::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================= */
+/* HAND CURSOR                                   */
+/* ============================================= */
+#hand-cursor {
+  position: fixed;
+  width: 25px;
+  height: 25px;
+  border: 3px solid rgb(255, 165, 50);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  transition: transform 0.1s ease, background 0.1s ease;
+  box-shadow: 0 0 15px rgba(255, 165, 50, 0.6);
+  display: none;
+  left: 0;
+  top: 0;
+}
+
+#hand-cursor.active {
+  display: block;
+}
+
+#hand-cursor.clicking {
+  background: rgba(255, 165, 50, 0.4);
+  transform: scale(1.4);
+}
+
+#hand-cursor.scroll-up::after {
+  content: '▲';
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgb(255, 165, 50);
+  font-size: 12px;
+}
+
+#hand-cursor.scroll-down::after {
+  content: '▼';
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgb(255, 165, 50);
+  font-size: 12px;
+}
+
+/* ============================================= */
+/* VIDEO FEED                                    */
+/* ============================================= */
+#hand-video-feed{
+  position: fixed !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+#hand-input-video{
+  position: fixed !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+}
+
+#hand-output-canvas{
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: transparent !important;
+  pointer-events: none !important;
+  z-index: 999999 !important;
+  transform: scaleX(-1);
+  display: block !important;
+}
+
+/* ============================================= */
+/* INSTRUCTIONS PANEL                            */
+/* ============================================= */
+#hand-instructions {
+  position: fixed;
+  bottom: calc(var(--cta-bottom) + var(--cta-size) + 20px);
+  left: var(--cta-left);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 25px;
+  border-radius: 15px;
+  max-width: 320px;
+  z-index: 99996;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 165, 50, 0.5);
+  animation: slideInLeft 0.5s ease;
+}
+
+#hand-instructions.hidden {
+  display: none;
+}
+
+#hand-instructions h3 {
+  margin: 0 0 15px 0;
+  color: rgb(255, 185, 80);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+#hand-instructions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 15px 0;
+}
+
+#hand-instructions li {
+  padding: 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#hand-instructions li:last-child {
+  border-bottom: none;
+}
+
+#hand-instructions li strong {
+  color: rgb(255, 185, 80);
+}
+
+#close-instructions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+#close-instructions:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: rotate(90deg);
+}
+
+/* ============================================= */
+/* UTILITY CLASSES                               */
+/* ============================================= */
+.hero_img-wrap {
+  opacity: 0;
+}
+
+.active-flip-item {
+  z-index: 2;
+}
+
+.fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+}
+
+/* ============================================= */
+/* RESPONSIVE - TABLET (1024px)                  */
+/* ============================================= */
+@media (max-width: 1024px) {
+  #vapiCard {
+    width: min(680px, calc(100vw - 24px));
+  }
+}
+
+/* ============================================= */
+/* RESPONSIVE - TABLET PORTRAIT (768px)          */
+/* ============================================= */
+@media (max-width: 768px) {
+  .vapi-head {
+    flex-wrap: wrap;
+  }
+  
+  .vapi-footer {
+    flex-wrap: wrap;
+  }
+
+  #hand-cursor {
+    width: 20px;
+    height: 20px;
+    border-width: 2px;
+  }
+  
+  #hand-instructions {
+    left: var(--cta-left);
+    right: var(--cta-right);
+    max-width: none;
+  }
+}
+
+/* ============================================= */
+/* RESPONSIVE - MOBILE (520px)                   */
+/* ============================================= */
+@media (max-width: 520px) {
+  #vapiOverlay {
+    align-items: flex-end;
+  }
+  
+  #vapiCard {
+    width: 100%;
+    max-width: 100%;
+    border-radius: clamp(20px, 4vw, 24px) clamp(20px, 4vw, 24px) 0 0;
+    margin: 0;
+  }
+  
+  .vapi-footer {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .vapi-footer .vapi-primary {
+    width: 100%;
+  }
+  
+  .vapi-footer .vapi-muted {
+    text-align: center;
+  }
+  
+  .vapi-preview-html {
+    max-height: 40vh;
+  }
+  
+  #vapiTooltip {
+    display: none !important;
+    opacity: 0 !important;
+  }
+
+  .vapi-status-icon {
+    width: 12px;
+    height: 12px;
+  }
+  
+  .vapi-status-icon svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+}
+
+/* ============================================= */
+/* RESPONSIVE - SMALL MOBILE (380px)             */
+/* ============================================= */
+@media (max-width: 380px) {
+  .vapi-ghost,
+  .vapi-primary {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  #hand-instructions {
+    padding: 16px;
+  }
+  
+  #hand-instructions h3 {
+    font-size: 15px;
+  }
+  
+  #hand-instructions li {
+    font-size: 12px;
+    padding: 6px 0;
+  }
+  
+  /* Status indicator small mobile */
+  .vapi-status-indicator {
+    padding: 5px 10px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* ============================================= */
+/* LANDSCAPE PHONES                              */
+/* ============================================= */
+@media (max-height: 500px) and (orientation: landscape) {
+  #vapiOverlay {
+    align-items: center;
+  }
+  
+  #vapiCard {
+    max-height: calc(100vh - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: clamp(16px, 3vw, 20px);
+  }
+  
+  .vapi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  
+  .vapi-preview-html {
+    max-height: 30vh;
+  }
+}
+
+/* ============================================= */
+/* REDUCED MOTION                                */
+/* ============================================= */
+@media (prefers-reduced-motion: reduce) {
+  #vapiCallBtn,
+  .wa-float,
+  #hand-toggle,
+  .vapi-status-indicator {
+    animation: none !important;
+  }
+  
+  #hand-toggle::after {
+    animation: none !important;
+  }
+}
+
+/* Status indicator mobile — keep it centered like a pill */
+.vapi-status-indicator {
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  #vapiStatusIndicator.vapi-status-indicator {
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    max-width: calc(100vw - 24px) !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* ============================================= */
+/* VAPI BUTTON - MOVE WHEN OVERLAY IS OPEN       */
+/* ============================================= */
+
+/* Smooth transition for button movement */
+#vapi-ws-pill {
+  transition: left 0.3s ease, right 0.3s ease, bottom 0.3s ease, top 0.3s ease, transform 0.3s ease;
+}
+
+#vapiCallBtn {
+  transition: width 0.3s ease, height 0.3s ease, transform 0.12s ease, background 0.25s ease;
+}
+
+/* When overlay is open, move button to bottom-right AND above overlay */
+body.vapi-overlay-open #vapi-ws-pill {
+  left: auto !important;
+  right: var(--cta-right) !important;
+  transform: none !important;
+  bottom: calc(var(--cta-bottom) + var(--cta-size) + 20px) !important;
+  z-index: 9999999 !important;
+}
+
+/* Make button slightly smaller when overlay is open */
+body.vapi-overlay-open #vapi-ws-pill #vapiCallBtn {
+  width: calc(var(--cta-size) - 8px);
+  height: calc(var(--cta-size) - 8px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+body.vapi-overlay-open #vapi-ws-pill #vapiBtnIcon {
+  width: calc(var(--cta-icon-size) - 6px);
+  height: calc(var(--cta-icon-size) - 6px);
+}
+
+/* Hide status indicator when overlay is open */
+body.vapi-overlay-open #vapiStatusIndicator {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+/* ============================================= */
+/* RESPONSIVE - TABLET                           */
+/* ============================================= */
+@media (max-width: 768px) {
+  body.vapi-overlay-open #vapi-ws-pill {
+    right: var(--cta-right) !important;
+    bottom: calc(var(--cta-bottom) + var(--cta-size) + 16px) !important;
+  }
+}
+
+/* ============================================= */
+/* RESPONSIVE - MOBILE                           */
+/* ============================================= */
+@media (max-width: 520px) {
+  body.vapi-overlay-open #vapi-ws-pill {
+    right: 12px !important;
+    bottom: auto !important;
+    top: 16px !important;
+  }
+  
+  body.vapi-overlay-open #vapi-ws-pill #vapiCallBtn {
+    width: calc(var(--cta-size) - 10px);
+    height: calc(var(--cta-size) - 10px);
+  }
+}
+
+/* ============================================= */
+/* RESPONSIVE - SMALL MOBILE                     */
+/* ============================================= */
+@media (max-width: 380px) {
+  body.vapi-overlay-open #vapi-ws-pill {
+    right: 10px !important;
+    top: 12px !important;
+  }
+  
+  body.vapi-overlay-open #vapi-ws-pill #vapiCallBtn {
+    width: calc(var(--cta-size) - 12px);
+    height: calc(var(--cta-size) - 12px);
+  }
+}
+  
+  
+/* ============================================ */
+/* LOADING SCREEN */
+/* ============================================ */
+
+#vapiScreenLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.vapi-loading-container {
+  text-align: center;
+  padding: 40px;
+}
+
+/* Spinner */
+.vapi-loading-spinner {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 30px;
+}
+
+.spinner-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  animation: vapi-spinner-rotate 1.5s linear infinite;
+}
+
+.spinner-ring:nth-child(1) {
+  border-top-color: rgba(212, 175, 55, 1);
+  animation-delay: 0s;
+}
+
+.spinner-ring:nth-child(2) {
+  border-right-color: rgba(212, 175, 55, 0.7);
+  animation-delay: 0.2s;
+  width: 70%;
+  height: 70%;
+  top: 15%;
+  left: 15%;
+}
+
+.spinner-ring:nth-child(3) {
+  border-bottom-color: rgba(212, 175, 55, 0.4);
+  animation-delay: 0.4s;
+  width: 40%;
+  height: 40%;
+  top: 30%;
+  left: 30%;
+}
+
+@keyframes vapi-spinner-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Loading Text */
+.vapi-loading-text {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 20px 0;
+}
+
+.vapi-loading-subtext {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  margin: 20px 0 0 0;
+}
+
+/* Progress Dots */
+.vapi-loading-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.progress-dot.active {
+  background: rgba(212, 175, 55, 1);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+/* ============================================ */
+/* BRD VIEWER SCREEN */
+/* ============================================ */
+
+#vapiScreenBRD {
+  padding: 20px;
+  max-height: calc(80vh - env(safe-area-inset-bottom, 0px));
+  max-height: calc(80dvh - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+}
+
+.vapi-brd-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* BRD Header */
+.vapi-brd-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: 20px;
+}
+
+.vapi-brd-header-icon {
+  font-size: 32px;
+}
+
+.vapi-brd-header-text h2 {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 5px 0;
+}
+
+.vapi-brd-header-text p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  margin: 0;
+}
+
+/* BRD Editor */
+.vapi-brd-editor-wrapper {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.vapi-brd-editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toolbar-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vapi-toolbar-btn {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.vapi-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+.vapi-brd-editor {
+  padding: 20px;
+  min-height: 300px;
+  max-height: min(400px, 50vh);
+  overflow-y: auto;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.6;
+  outline: none;
+}
+
+.vapi-brd-editor:focus {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* BRD Editor Content Styles */
+.vapi-brd-editor h2 {
+  color: #fff !important;
+  font-size: 18px;
+  font-weight: 700;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.8) !important;
+  padding-bottom: 8px;
+  margin-top: 25px;
+}
+
+.vapi-brd-editor h3 {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 20px;
+}
+
+.vapi-brd-editor p {
+  color: rgba(255, 255, 255, 0.8) !important;
+  margin: 10px 0;
+}
+
+.vapi-brd-editor ul,
+.vapi-brd-editor ol {
+  color: rgba(255, 255, 255, 0.8);
+  padding-left: 20px;
+}
+
+.vapi-brd-editor li {
+  margin: 5px 0;
+}
+
+.vapi-brd-editor strong {
+  color: rgba(212, 175, 55, 1);
+}
+
+/* Section Header (reusable) */
+.vapi-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.section-icon {
+  font-size: 18px;
+}
+
+.section-title {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* Design Preview Section */
+.vapi-brd-design-section {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 20px;
+  margin-bottom: 20px;
+  display: none;
+}
+
+.vapi-brd-design-section.is-visible {
+  display: block;
+}
+
+.vapi-design-preview {
+  text-align: center;
+}
+
+.vapi-design-preview img {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.design-caption {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 10px 0 0 0;
+}
+
+/* Upload Section */
+.vapi-brd-upload-section {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.vapi-upload-area {
+  text-align: center;
+}
+
+.vapi-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 30px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.vapi-upload-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(212, 175, 55, 0.6);
+}
+
+.upload-icon {
+  font-size: 24px;
+  color: rgba(212, 175, 55, 1);
+}
+
+.upload-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 10px 0 0 0;
+}
+
+/* Upload Preview */
+.vapi-upload-preview {
+  margin-top: 15px;
+  display: none;
+}
+
+.vapi-upload-preview.has-file {
+  display: block;
+}
+
+.upload-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 10px;
+}
+
+.upload-preview-item img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.upload-preview-item span {
+  flex: 1;
+  color: #fff;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-upload {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 100, 100, 0.2);
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  color: #ff6464;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.remove-upload:hover {
+  background: rgba(255, 100, 100, 0.3);
+}
+
+/* Email Section */
+.vapi-brd-email-section {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.vapi-email-input-wrapper {
+  position: relative;
+}
+
+.vapi-email-input {
+  width: 100%;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.vapi-email-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.vapi-email-input:focus {
+  border-color: rgba(212, 175, 55, 0.8);
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
+}
+
+/* Submit Section */
+.vapi-brd-submit-section {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.vapi-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 18px 30px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.9), rgba(180, 145, 35, 0.9));
+  border: 1px solid rgba(212, 175, 55, 0.8);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+}
+
+.vapi-submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(212, 175, 55, 0.4);
+}
+
+.vapi-submit-btn:active {
+  transform: translateY(0);
+}
+
+.vapi-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.submit-icon {
+  font-size: 20px;
+}
+
+.submit-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 12px 0 0 0;
+}
+
+/* ============================================ */
+/* SUCCESS SCREEN */
+/* ============================================ */
+
+#vapiScreenSuccess {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 450px;
+}
+
+.vapi-success-container {
+  text-align: center;
+  padding: 40px 20px;
+  max-width: 400px;
+}
+
+/* Success Icon */
+.vapi-success-icon-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 30px;
+}
+
+.vapi-success-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 1), rgba(180, 145, 35, 1));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  animation: vapi-success-pop 0.5s ease-out;
+}
+
+.vapi-success-icon svg {
+  width: 32px;
+  height: 32px;
+  color: #fff;
+}
+
+.success-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(212, 175, 55, 0.3);
+  border-radius: 50%;
+  animation: vapi-success-ring 1s ease-out;
+}
+
+@keyframes vapi-success-pop {
+  0% { transform: translate(-50%, -50%) scale(0); }
+  60% { transform: translate(-50%, -50%) scale(1.1); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes vapi-success-ring {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(1.2); opacity: 0; }
+}
+
+/* Success Text */
+.vapi-success-title {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 10px 0;
+}
+
+.vapi-success-subtitle {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  margin: 0 0 25px 0;
+}
+
+/* Email Info */
+.vapi-success-email-info {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 15px 20px;
+  margin-bottom: 25px;
+}
+
+.vapi-success-email-info p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.vapi-success-email-info strong {
+  color: #fff;
+}
+
+/* Action Buttons */
+.vapi-success-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.vapi-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.vapi-action-primary {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.9), rgba(180, 145, 35, 0.9));
+  border: 1px solid rgba(212, 175, 55, 0.8);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+}
+
+.vapi-action-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(212, 175, 55, 0.4);
+}
+
+.vapi-action-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.vapi-action-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-icon {
+  font-size: 18px;
+}
+
+/* Success Note */
+.vapi-success-note {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ============================================ */
+/* SCROLLBAR STYLING */
+/* ============================================ */
+
+#vapiScreenBRD::-webkit-scrollbar,
+.vapi-brd-editor::-webkit-scrollbar {
+  width: 8px;
+}
+
+#vapiScreenBRD::-webkit-scrollbar-track,
+.vapi-brd-editor::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+#vapiScreenBRD::-webkit-scrollbar-thumb,
+.vapi-brd-editor::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.5);
+  border-radius: 4px;
+}
+
+#vapiScreenBRD::-webkit-scrollbar-thumb:hover,
+.vapi-brd-editor::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.7);
+}
+
+/* ============================================ */
+/* RESPONSIVE */
+/* ============================================ */
+
+@media (max-width: 480px) {
+  .vapi-brd-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .vapi-brd-header-text h2 {
+    font-size: 18px;
+  }
+  
+  .vapi-success-actions {
+    gap: 10px;
+  }
+  
+  .vapi-action-btn {
+    padding: 14px 20px;
+    font-size: 14px;
+  }
+  
+
+}  

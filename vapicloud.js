@@ -2061,7 +2061,7 @@ btn?.addEventListener("click", () => {
       return await response.json();
     }
 */
-async function submitBRD() {
+/*async function submitBRD() {
   const userEmail = brdEmailInput?.value?.trim();
   if (!userEmail || !userEmail.includes('@')) { 
     alert('Please enter a valid email'); 
@@ -2104,6 +2104,53 @@ async function submitBRD() {
       if (t) t.textContent = "Submit & Send BRD";
     }
   }
+}*/
+    async function submitBRD() {
+  const userEmail = brdEmailInput?.value?.trim();
+  if (!userEmail || !userEmail.includes('@')) { 
+    alert('Please enter a valid email'); 
+    brdEmailInput?.focus();
+    return; 
+  }
+  
+  if (brdSubmitBtn) {
+    brdSubmitBtn.disabled = true;
+    const submitText = brdSubmitBtn.querySelector('.submit-text');
+    if (submitText) submitText.textContent = "Generating & Sending...";
+  }
+  
+  try {
+    const pdfHtml = buildPDFContent();
+    
+    const response = await fetch(`${BRD_PDF_WORKER_URL}/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userEmail: userEmail,
+        pdfHtml: pdfHtml
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to send BRD");
+    }
+    
+    // Save download URL
+    generatedBRD.downloadUrl = result.downloadUrl;
+    
+    showSuccessScreen(userEmail);
+    
+  } catch (error) {
+    console.error('[Submit BRD Error]', error);
+    alert('Failed: ' + error.message);
+    if (brdSubmitBtn) {
+      brdSubmitBtn.disabled = false;
+      const t = brdSubmitBtn.querySelector('.submit-text');
+      if (t) t.textContent = "Submit & Send BRD";
+    }
+  }
 }
 
     function showSuccessScreen(userEmail) {
@@ -2111,7 +2158,7 @@ async function submitBRD() {
       showScreen(screenSuccess);
     }
 
-    function downloadPDF() {
+ /*  function downloadPDF() {
       if (!generatedBRD.pdfBlob) { alert('No PDF available'); return; }
       const url = URL.createObjectURL(generatedBRD.pdfBlob);
       const a = document.createElement('a');
@@ -2119,7 +2166,14 @@ async function submitBRD() {
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
-
+*/
+    function downloadPDF() {
+  if (!generatedBRD.downloadUrl) { 
+    alert('No PDF available'); 
+    return; 
+  }
+  window.open(generatedBRD.downloadUrl, '_blank');
+}
     function startNewProject() {
       // UNLOCK BRD MODE
       inBRDMode = false;

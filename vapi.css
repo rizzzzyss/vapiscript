@@ -2119,28 +2119,63 @@ body.vapi-overlay-open #vapiStatusIndicator {
 /* SUCCESS SCREEN - DARK THEME FIX */
 /* ============================================ */
 
+/* Success Screen - Final Fix */
+#vapiCard {
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+}
+
 #vapiScreenSuccess {
-  background: transparent !important;
+  min-height: auto !important;
+  padding-bottom: 30px !important;
 }
 
 #vapiScreenSuccess .vapi-success-container {
-  background: transparent !important;
+  padding: 15px 20px 30px !important;
+}
+
+#vapiScreenSuccess .vapi-success-icon-wrapper {
+  width: 60px !important;
+  height: 60px !important;
+  margin-bottom: 15px !important;
+}
+
+#vapiScreenSuccess .vapi-success-icon {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+#vapiScreenSuccess .vapi-success-title {
+  font-size: 18px !important;
+  margin-bottom: 5px !important;
+}
+
+#vapiScreenSuccess .vapi-success-subtitle {
+  font-size: 13px !important;
+  margin-bottom: 12px !important;
 }
 
 #vapiScreenSuccess .vapi-success-email-info {
   background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  padding: 10px 15px !important;
+  margin-bottom: 12px !important;
 }
 
 #vapiScreenSuccess .vapi-success-email-info p {
-  color: rgba(255, 255, 255, 0.85) !important;
-  background: transparent !important;
+  color: #fff !important;
+  font-size: 13px !important;
+  margin: 4px 0 !important;
 }
 
-#vapiScreenSuccess .vapi-success-email-info strong {
-  color: #fff !important;
+#vapiScreenSuccess .vapi-success-actions {
+  gap: 8px !important;
+  margin-bottom: 12px !important;
+}
+
+#vapiScreenSuccess .vapi-action-btn {
+  padding: 12px 18px !important;
+  font-size: 13px !important;
 }
 
 #vapiScreenSuccess .vapi-action-btn.vapi-action-secondary {
@@ -2149,21 +2184,12 @@ body.vapi-overlay-open #vapiStatusIndicator {
   color: #fff !important;
 }
 
-#vapiScreenSuccess .vapi-action-btn.vapi-action-secondary:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
-}
-
-#vapiScreenSuccess .vapi-success-title {
-  color: #fff !important;
-  background: transparent !important;
-}
-
-#vapiScreenSuccess .vapi-success-subtitle {
-  color: rgba(255, 255, 255, 0.7) !important;
-  background: transparent !important;
+#vapiScreenSuccess .vapi-action-btn.vapi-action-primary {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.9), rgba(180, 145, 35, 0.9)) !important;
+  color: #000 !important;
 }
 
 #vapiScreenSuccess .vapi-success-note {
   color: rgba(255, 255, 255, 0.5) !important;
-  background: transparent !important;
+  font-size: 11px !important;
 }

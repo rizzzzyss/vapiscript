@@ -185,6 +185,43 @@ const btn  = document.getElementById("vapiCallBtn");
 btn?.addEventListener("click", () => {
   wrap?.classList.add("is-open");
 });
+
+document.getElementById('vapiSuccessCloseBtn')?.addEventListener('click', () => {
+  inBRDMode = false;
+  
+  window.__vapiUi.collected = {};
+  window.__vapiUi.selected.clear();
+  window.__vapiUi.flow = null;
+  window.__vapiUi.step = null;
+  window.__vapiUi.pendingField = null;
+  window.__vapiUi.lastCategory = null;
+  
+  generatedBRD = { 
+    originalHtml: "", 
+    html: "", 
+    designImageBase64: null, 
+    designImageUrl: null, 
+    designSource: null, 
+    userUploadedImageBase64: null, 
+    userUploadedImageName: null, 
+    pdfBase64: null, 
+    pdfBlob: null, 
+    pdfFilename: null,
+    downloadUrl: null
+  };
+  
+  overlay.classList.remove('is-open');
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('vapi-overlay-open');
+  
+  [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess].forEach(s => {
+    if (s) s.classList.remove('is-active');
+  });
+  
+  if (closeBtn) closeBtn.style.display = '';
+  if (backBtn) backBtn.style.display = '';
+});
+    
     // ============================================
     // STATUS INDICATOR FUNCTIONS
     // ============================================

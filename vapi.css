@@ -2454,3 +2454,8 @@ body.vapi-overlay-open #vapiStatusIndicator {
     font-size: 14px !important;
   }
 }
+html.vapi-overlay-open,
+body.vapi-overlay-open{
+  overflow: hidden !important;
+  height: 100% !important;
+}

@@ -858,6 +858,8 @@ btn?.addEventListener("click", () => {
       socket.onopen = async () => {
         clearTimeout(t);
         stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+          try { window.stopHandMode?.(); } catch (err) { console.warn('[HAND] stopHandMode failed', err); }
+
         audioContext = new(window.AudioContext || window.webkitAudioContext);
         await audioContext.resume();
         const n = createWorkletProcessorBlob();

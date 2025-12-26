@@ -1,0 +1,279 @@
+<style>
+/* =========================================================
+   GESTURE TUTORIAL CSS
+   Add this to your Webflow custom code (Site Settings > Custom Code > Head)
+   Wrap in <style> tags when adding to Webflow
+   ========================================================= */
+
+/* Tutorial Overlay Container */
+#gesture-tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 999999;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#gesture-tutorial-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+
+#gesture-tutorial-overlay.fade-out {
+  opacity: 0;
+}
+
+/* Tutorial Content */
+.gesture-tutorial-content {
+  display: flex;
+  flex-direction: row;
+  gap: 50px;
+  padding: 40px 60px;
+  max-width: 1200px;
+}
+
+@media (max-width: 900px) {
+  .gesture-tutorial-content {
+    flex-direction: column;
+    gap: 30px;
+    padding: 30px;
+  }
+}
+
+/* Individual Gesture Card */
+.gesture-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 200px;
+}
+
+.gesture-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+}
+
+.gesture-card-action {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 20px;
+}
+
+/* Hand SVG Container */
+.gesture-hand-container {
+  width: 120px;
+  height: 160px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Hand SVG Base Styles */
+.gesture-hand-svg {
+  width: 80px;
+  height: auto;
+  filter: drop-shadow(0 4px 20px rgba(0, 255, 100, 0.3));
+}
+
+/* =========================================================
+   SCROLL UP ANIMATION
+   ========================================================= */
+.scroll-up-hand {
+  animation: scrollUpAnim 1.8s ease-in-out infinite;
+}
+
+@keyframes scrollUpAnim {
+  0%, 100% {
+    transform: translateY(30px);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-30px);
+    opacity: 1;
+  }
+}
+
+/* Arrow indicator for scroll up */
+.gesture-card.scroll-up .gesture-hand-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 16px solid rgba(0, 255, 100, 0.6);
+  animation: arrowPulseUp 1.8s ease-in-out infinite;
+}
+
+@keyframes arrowPulseUp {
+  0%, 100% { 
+    opacity: 0.3; 
+    transform: translateX(-50%) translateY(10px); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: translateX(-50%) translateY(-5px); 
+  }
+}
+
+/* =========================================================
+   SCROLL DOWN ANIMATION
+   ========================================================= */
+.scroll-down-hand {
+  animation: scrollDownAnim 1.8s ease-in-out infinite;
+}
+
+@keyframes scrollDownAnim {
+  0%, 100% {
+    transform: translateY(-30px);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(30px);
+    opacity: 1;
+  }
+}
+
+/* Arrow indicator for scroll down */
+.gesture-card.scroll-down .gesture-hand-container::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 16px solid rgba(0, 255, 100, 0.6);
+  animation: arrowPulseDown 1.8s ease-in-out infinite;
+}
+
+@keyframes arrowPulseDown {
+  0%, 100% { 
+    opacity: 0.3; 
+    transform: translateX(-50%) translateY(-10px); 
+  }
+  50% { 
+    opacity: 1; 
+    transform: translateX(-50%) translateY(5px); 
+  }
+}
+
+/* =========================================================
+   PINCH TO CLICK ANIMATION
+   ========================================================= */
+.pinch-hand {
+  animation: pinchAnim 2s ease-in-out infinite;
+}
+
+@keyframes pinchAnim {
+  0%, 20%, 100% {
+    transform: scale(1);
+  }
+  35%, 65% {
+    transform: scale(0.9);
+  }
+}
+
+/* Pinch indicator circle */
+.gesture-card.pinch .gesture-hand-container::after {
+  content: '';
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(0, 255, 100, 0.8);
+  border-radius: 50%;
+  animation: pinchCircle 2s ease-in-out infinite;
+}
+
+@keyframes pinchCircle {
+  0%, 20%, 100% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.3;
+  }
+  35%, 65% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 1;
+  }
+}
+
+/* =========================================================
+   UI ELEMENTS
+   ========================================================= */
+
+/* Skip button */
+.gesture-skip-btn {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 30px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 30px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.gesture-skip-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Tutorial title */
+.gesture-tutorial-title {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+}
+
+.gesture-tutorial-title span {
+  color: #00ff64;
+}
+
+/* Countdown timer */
+.gesture-countdown {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+}
+</style>

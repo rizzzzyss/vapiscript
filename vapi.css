@@ -2195,3 +2195,262 @@ body.vapi-overlay-open #vapiStatusIndicator {
   color: rgba(255, 255, 255, 0.5) !important;
   font-size: 11px !important;
 }
+
+/* ============================================ */
+/* BRD SCREEN - WHITE GLASSY THEME (ADD THIS) */
+/* ============================================ */
+
+/* Scroll Hint - Hide by default */
+#scrollHint {
+  display: none;
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 15px 0;
+  text-align: center;
+  background: transparent !important;
+  z-index: 100;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+#vapiScreenBRD.is-active #scrollHint {
+  display: block;
+}
+
+#scrollHint .scroll-hint-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(212, 175, 55, 0.2);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 20px;
+  animation: pulseHint 2s ease-in-out infinite;
+}
+
+#scrollHint span {
+  color: rgba(212, 175, 55, 1);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@keyframes pulseHint {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(-5px); opacity: 0.8; }
+}
+
+/* BRD Screen Layout */
+#vapiScreenBRD {
+  overflow: visible !important;
+  max-height: none !important;
+  padding: 20px !important;
+}
+
+#vapiScreenBRD .vapi-brd-container {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+/* White Glassy Editor */
+#vapiScreenBRD .vapi-brd-editor-wrapper {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+  margin-bottom: 20px !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor-toolbar {
+  background: rgba(245, 245, 245, 0.9) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor-toolbar .toolbar-label {
+  color: #333 !important;
+}
+
+#vapiScreenBRD .vapi-toolbar-btn {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  color: #333 !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor {
+  background: transparent !important;
+  color: #333 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 24px !important;
+  font-size: 15px !important;
+  line-height: 1.7 !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor * {
+  background: transparent !important;
+  background-color: transparent !important;
+  max-width: 100% !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor h1,
+#vapiScreenBRD .vapi-brd-editor h2 {
+  color: #1a1a1a !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  margin: 20px 0 12px !important;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.6) !important;
+  padding-bottom: 10px !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor h3 {
+  color: #2a2a2a !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  margin: 16px 0 10px !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor p {
+  color: #444 !important;
+  font-size: 15px !important;
+  margin: 10px 0 !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor ul,
+#vapiScreenBRD .vapi-brd-editor ol {
+  color: #444 !important;
+  padding-left: 24px !important;
+  margin: 10px 0 !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor li {
+  color: #444 !important;
+  margin: 6px 0 !important;
+  font-size: 15px !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor strong {
+  color: #b8860b !important;
+  font-weight: 700 !important;
+}
+
+#vapiScreenBRD .vapi-brd-editor div {
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* Upload & Email Sections */
+#vapiScreenBRD .vapi-brd-upload-section,
+#vapiScreenBRD .vapi-brd-email-section {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  margin-bottom: 20px !important;
+}
+
+#vapiScreenBRD .vapi-brd-submit-section {
+  padding-bottom: 80px !important;
+}
+
+/* ============================================ */
+/* BRD RESPONSIVE - TABLET (768px) */
+/* ============================================ */
+@media (max-width: 768px) {
+  #vapiScreenBRD {
+    padding: 15px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor {
+    padding: 18px !important;
+    font-size: 14px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor h1,
+  #vapiScreenBRD .vapi-brd-editor h2 {
+    font-size: 18px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor h3 {
+    font-size: 16px !important;
+  }
+  
+  #scrollHint .scroll-hint-content {
+    padding: 8px 16px;
+  }
+  
+  #scrollHint span {
+    font-size: 13px;
+  }
+}
+
+/* ============================================ */
+/* BRD RESPONSIVE - MOBILE (520px) */
+/* ============================================ */
+@media (max-width: 520px) {
+  #vapiScreenBRD {
+    padding: 12px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor-wrapper {
+    border-radius: 12px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor {
+    padding: 15px !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor h1,
+  #vapiScreenBRD .vapi-brd-editor h2 {
+    font-size: 16px !important;
+    margin: 15px 0 10px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor h3 {
+    font-size: 15px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor p,
+  #vapiScreenBRD .vapi-brd-editor li {
+    font-size: 13px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-upload-section,
+  #vapiScreenBRD .vapi-brd-email-section {
+    padding: 15px !important;
+    border-radius: 12px !important;
+  }
+  
+  #scrollHint .scroll-hint-content {
+    padding: 8px 14px;
+  }
+  
+  #scrollHint span {
+    font-size: 12px;
+  }
+}
+
+/* ============================================ */
+/* BRD RESPONSIVE - SMALL MOBILE (380px) */
+/* ============================================ */
+@media (max-width: 380px) {
+  #vapiScreenBRD .vapi-brd-editor {
+    padding: 12px !important;
+    font-size: 12px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor h1,
+  #vapiScreenBRD .vapi-brd-editor h2 {
+    font-size: 15px !important;
+  }
+  
+  #vapiScreenBRD .vapi-brd-editor h3 {
+    font-size: 14px !important;
+  }
+}

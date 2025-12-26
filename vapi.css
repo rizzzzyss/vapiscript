@@ -2115,10 +2115,6 @@ body.vapi-overlay-open #vapiStatusIndicator {
   
 
 }  
-/* ============================================ */
-/* SUCCESS SCREEN - DARK THEME FIX */
-/* ============================================ */
-
 /* Success Screen - Final Fix */
 #vapiCard {
   max-height: 90vh !important;

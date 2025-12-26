@@ -221,6 +221,29 @@ document.getElementById('vapiSuccessCloseBtn')?.addEventListener('click', () => 
   if (closeBtn) closeBtn.style.display = '';
   if (backBtn) backBtn.style.display = '';
 });
+
+
+function initBRDScrollHint() {
+  const card = document.getElementById('vapiCard');
+  const hint = document.getElementById('scrollHint');
+  
+  if (!card || !hint) return;
+  
+  hint.style.opacity = '1';
+  
+  setTimeout(() => {
+    card.scrollTo({ top: 80, behavior: 'smooth' });
+    setTimeout(() => {
+      card.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 800);
+  }, 500);
+  
+  card.onscroll = function() {
+    const isAtBottom = this.scrollHeight - this.scrollTop <= this.clientHeight + 100;
+    hint.style.opacity = isAtBottom ? '0' : '1';
+  };
+}
+    
     
     // ============================================
     // STATUS INDICATOR FUNCTIONS

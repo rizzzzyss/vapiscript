@@ -1,11 +1,6 @@
 <style>
-/* =========================================================
-   GESTURE TUTORIAL CSS
-   Add this to your Webflow custom code (Site Settings > Custom Code > Head)
-   Wrap in <style> tags when adding to Webflow
-   ========================================================= */
+/* Gesture Tutorial CSS */
 
-/* Tutorial Overlay Container */
 #gesture-tutorial-overlay {
   position: fixed;
   top: 0;
@@ -32,7 +27,6 @@
   opacity: 0;
 }
 
-/* Tutorial Content */
 .gesture-tutorial-content {
   display: flex;
   flex-direction: row;
@@ -49,7 +43,6 @@
   }
 }
 
-/* Individual Gesture Card */
 .gesture-card {
   display: flex;
   flex-direction: column;
@@ -78,7 +71,6 @@
   margin-top: 20px;
 }
 
-/* Hand SVG Container */
 .gesture-hand-container {
   width: 120px;
   height: 160px;
@@ -88,16 +80,13 @@
   align-items: center;
 }
 
-/* Hand SVG Base Styles */
 .gesture-hand-svg {
   width: 80px;
   height: auto;
   filter: drop-shadow(0 4px 20px rgba(0, 255, 100, 0.3));
 }
 
-/* =========================================================
-   SCROLL UP ANIMATION
-   ========================================================= */
+/* SCROLL UP ANIMATION */
 .scroll-up-hand {
   animation: scrollUpAnim 1.8s ease-in-out infinite;
 }
@@ -113,7 +102,6 @@
   }
 }
 
-/* Arrow indicator for scroll up */
 .gesture-card.scroll-up .gesture-hand-container::before {
   content: '';
   position: absolute;
@@ -139,9 +127,7 @@
   }
 }
 
-/* =========================================================
-   SCROLL DOWN ANIMATION
-   ========================================================= */
+/* SCROLL DOWN ANIMATION */
 .scroll-down-hand {
   animation: scrollDownAnim 1.8s ease-in-out infinite;
 }
@@ -157,7 +143,6 @@
   }
 }
 
-/* Arrow indicator for scroll down */
 .gesture-card.scroll-down .gesture-hand-container::before {
   content: '';
   position: absolute;
@@ -183,9 +168,7 @@
   }
 }
 
-/* =========================================================
-   PINCH TO CLICK ANIMATION
-   ========================================================= */
+/* PINCH TO CLICK ANIMATION */
 .pinch-hand {
   animation: pinchAnim 2s ease-in-out infinite;
 }
@@ -199,7 +182,6 @@
   }
 }
 
-/* Pinch indicator circle */
 .gesture-card.pinch .gesture-hand-container::after {
   content: '';
   position: absolute;
@@ -224,11 +206,7 @@
   }
 }
 
-/* =========================================================
-   UI ELEMENTS
-   ========================================================= */
-
-/* Skip button */
+/* UI ELEMENTS */
 .gesture-skip-btn {
   position: absolute;
   bottom: 30px;
@@ -250,7 +228,6 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* Tutorial title */
 .gesture-tutorial-title {
   position: absolute;
   top: 40px;
@@ -267,7 +244,6 @@
   color: #00ff64;
 }
 
-/* Countdown timer */
 .gesture-countdown {
   position: absolute;
   bottom: 80px;
@@ -276,4 +252,5 @@
   font-size: 14px;
   color: rgba(255, 255, 255, 0.5);
 }
+
 </style>

@@ -927,7 +927,7 @@ function initBRDScrollHint() {
         URL.revokeObjectURL(n);
         source = audioContext.createMediaStreamSource(stream);
         const i = audioContext.createGain();
-        i.gain.value = 2.5;
+        i.gain.value = 4.0;
         workletNode = new AudioWorkletNode(audioContext, "vapi-audio-processor");
         workletNode.port.onmessage = s => { socket?.readyState === WebSocket.OPEN && socket.send(s.data); processAudioForVAD(s.data); };
         source.connect(i);

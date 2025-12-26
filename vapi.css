@@ -2122,8 +2122,14 @@ body.vapi-overlay-open #vapiStatusIndicator {
 }
 
 #vapiScreenSuccess {
-  min-height: auto !important;
-  padding-bottom: 30px !important;
+  position: relative;
+}
+
+#vapiScreenSuccess .vapi-success-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 10;
 }
 
 #vapiScreenSuccess .vapi-success-container {

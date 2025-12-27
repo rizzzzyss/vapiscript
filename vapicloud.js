@@ -470,11 +470,11 @@ function initBRDScrollHint() {
 
    closeBtn?.addEventListener("click", attemptCloseOverlay);
 
-// ADD THESE TWO LINES ↓
+/*// ADD THESE TWO LINES ↓
 document.getElementById('vapiPreviewHeaderCloseBtn')?.addEventListener('click', attemptCloseOverlay);
 document.getElementById('vapiPreviewFooterCloseBtn')?.addEventListener('click', attemptCloseOverlay);
 // ↑ END
-
+*/
 backBtn?.addEventListener("click", () => {
   if (inBRDMode) return;
   sendToolResult({ action: "back", category: window.__vapiUi.lastCategory });
@@ -662,7 +662,7 @@ backBtn?.addEventListener("click", () => {
       setHeader("Requirement Preview", "Approve or go back to edit.");
       previewHtmlEl && (previewHtmlEl.innerHTML = generatePreviewHtml(e));
       previewLinkEl && (previewLinkEl.style.display = "none");
-       if (closeBtn) closeBtn.style.display = 'inline-block';
+      /* if (closeBtn) closeBtn.style.display = 'inline-block';*/
 
       showScreen(screenPreview);
     }

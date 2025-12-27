@@ -468,13 +468,18 @@ function initBRDScrollHint() {
       e.target === overlay && attemptCloseOverlay();
     });
 
-    closeBtn?.addEventListener("click", attemptCloseOverlay);
+   closeBtn?.addEventListener("click", attemptCloseOverlay);
 
-    backBtn?.addEventListener("click", () => {
-      if (inBRDMode) return;
-      sendToolResult({ action: "back", category: window.__vapiUi.lastCategory });
-      hideOverlay();
-    });
+// ADD THESE TWO LINES ↓
+document.getElementById('vapiPreviewHeaderCloseBtn')?.addEventListener('click', attemptCloseOverlay);
+document.getElementById('vapiPreviewFooterCloseBtn')?.addEventListener('click', attemptCloseOverlay);
+// ↑ END
+
+backBtn?.addEventListener("click", () => {
+  if (inBRDMode) return;
+  sendToolResult({ action: "back", category: window.__vapiUi.lastCategory });
+  hideOverlay();
+});
 
     // ============================================
     // TOOL RESULT & MESSAGE FUNCTIONS

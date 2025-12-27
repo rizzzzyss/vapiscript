@@ -697,7 +697,7 @@ backBtn?.addEventListener("click", () => {
       pendingToolName = null;
       
       // Hide close/back buttons
-      if (closeBtn) closeBtn.style.display = 'none';
+     /* if (closeBtn) closeBtn.style.display = 'none';*/
       if (backBtn) backBtn.style.display = 'none';
       
       setUiProcessing(true);

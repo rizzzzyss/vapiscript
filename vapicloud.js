@@ -437,14 +437,26 @@ function initBRDScrollHint() {
     }
 
     // MODIFIED: Block close when in BRD mode
-    function attemptCloseOverlay() {
+   /* function attemptCloseOverlay() {
       if (inBRDMode) {
         alert("Please complete or submit your BRD first.");
         return;
       }
       if (!confirm("If you close now, you will lose the data and you must start from the beginning. Close anyway?")) return;
       isActive ? (stopCall(true), setState("idle")) : hideOverlay();
-    }
+    }*/
+
+    function attemptCloseOverlay() {
+  if (inBRDMode) {
+    const ok = confirm("Close BRD and lose changes?");
+    if (!ok) return;
+    inBRDMode = false;
+    if (closeBtn) closeBtn.style.display = '';
+    if (backBtn) backBtn.style.display = '';
+  }
+  isActive ? (stopCall(true), setState("idle")) : hideOverlay();
+}
+
 
     // MODIFIED: Added new screens
     function showScreen(e) {

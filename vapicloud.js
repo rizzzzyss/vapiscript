@@ -459,6 +459,12 @@ function initBRDScrollHint() {
       [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess].forEach(t => {
         t && (t.classList.remove("is-active"), t.style.opacity = "1", t.style.pointerEvents = "auto");
       });
+
+       if (e === screenSuccess) {
+    if (closeBtn) closeBtn.style.display = "none";
+  } else {
+    if (closeBtn) closeBtn.style.display = "";
+  }
       e?.classList.add("is-active");
     }
 

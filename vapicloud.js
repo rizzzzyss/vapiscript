@@ -658,12 +658,24 @@ backBtn?.addEventListener("click", () => {
       return n.length ? `<div>${n.join("")}</div>` : '<div style="font-weight:800;opacity:.75">No data captured yet.</div>';
     }
 
-    function renderPreview(e) {
+   /* function renderPreview(e) {
       setHeader("Requirement Preview", "Approve or go back to edit.");
       previewHtmlEl && (previewHtmlEl.innerHTML = generatePreviewHtml(e));
       previewLinkEl && (previewLinkEl.style.display = "none");
       showScreen(screenPreview);
+    }*/
+        function renderPreview(e) {
+      setHeader("Requirement Preview", "Approve or go back to edit.");
+      previewHtmlEl && (previewHtmlEl.innerHTML = generatePreviewHtml(e));
+      previewLinkEl && (previewLinkEl.style.display = "none");
+  const previewHeaderBtn = document.getElementById('vapiPreviewHeaderCloseBtn');
+  const previewFooterBtn = document.getElementById('vapiPreviewFooterCloseBtn');
+  if (previewHeaderBtn) previewHeaderBtn.style.display = 'inline-block';
+  if (previewFooterBtn) previewFooterBtn.style.display = 'inline-block';
+                                                  
+      showScreen(screenPreview);
     }
+    
 
     // ============================================
     // APPROVE BUTTON - TRIGGERS BRD MODE

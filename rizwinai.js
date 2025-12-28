@@ -908,7 +908,7 @@ backBtn?.addEventListener("click", () => {
     // TOOL RESULT & MESSAGE FUNCTIONS
     // ============================================
 
-    function sendToolResult(e) {
+    /*function sendToolResult(e) {
       if (!socket || socket.readyState !== WebSocket.OPEN) return;
       const t = pendingToolCallId;
       if (!t) {
@@ -920,8 +920,39 @@ backBtn?.addEventListener("click", () => {
       socket.send(JSON.stringify({ type: "add-message", message: { role: "tool", tool_call_id: t, content: n } }));
       pendingToolCallId = null;
       pendingToolName = null;
-    }
+    }*/
+function sendToolResult(e) {
+      try {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        const t = pendingToolCallId;
+        
+        if (!t) {
+          sendAsUserMessage(typeof e == "string" ? e : e.value || e.userInput || JSON.stringify(e));
+          return;
+        }
 
+        const n = typeof e == "string" ? e : JSON.stringify(e);
+        
+        // Notify the AI of the tool result
+        socket.send(JSON.stringify({ 
+          type: "tool-calls-result", 
+          toolCallResult: { toolCallId: t, result: n } 
+        }));
+        
+        // Add to history
+        socket.send(JSON.stringify({ 
+          type: "add-message", 
+          message: { role: "tool", tool_call_id: t, content: n } 
+        }));
+
+        // Reset state & inform the activity monitor
+        pendingToolCallId = null;
+        pendingToolName = null;
+        recordToolActivity(); // CRITICAL: Prevents auto-disconnect
+      } catch (error) {
+        logError(error, { context: 'sendToolResult', toolName: pendingToolName });
+      }
+    }
     function sendAsUserMessage(e) {
       if (!socket || socket.readyState !== WebSocket.OPEN) return;
       socket.send(JSON.stringify({ type: "add-message", message: { role: "user", content: e } }));

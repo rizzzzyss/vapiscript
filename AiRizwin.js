@@ -448,8 +448,8 @@
 
     const screenCalendly = document.getElementById("vapiScreenCalendly"),
       calendlyWidget = document.getElementById("calendlyWidget"),
-      skipCalendlyBtn = document.getElementById("vapiSkipCalendly"
-
+  skipCalendlyBtn = document.getElementById("vapiSkipCalendly");
+    
     if (!pill || !icon || !overlay) {
       logError(new Error('Required DOM elements not found'), { context: 'dom_init' });
       console.error('[Vapi] Required DOM elements not found.');

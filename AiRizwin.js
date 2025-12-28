@@ -1224,11 +1224,20 @@ backBtn?.addEventListener("click", () => {
           renderEmailScreen();
           return;*/
 
-            console.log("[ToolCall] SKIPPED ui_show_email – directly generating BRD");
-  inBRDMode = true;
-  if (backBtn) backBtn.style.display = "none";
-  setUiProcessing(true);
-  await generateFullBRD();  // goes straight to generation without preview
+     console.log("[ToolCall] SKIPPED ui_show_email – directly generating BRD");
+
+  // run BRD generation asynchronously (no await here)
+  (async () => {
+    inBRDMode = true;
+    if (backBtn) backBtn.style.display = "none";
+    setUiProcessing(true);
+    try {
+      await generateFullBRD();
+    } catch (err) {
+      console.error("[BRD Generation Error]", err);
+    }
+  })();
+
   return;
         }
         if (a === "ui_close") {

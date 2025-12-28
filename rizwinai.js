@@ -507,12 +507,10 @@ function initBRDScrollHint() {
 
     function attemptCloseOverlay() {
       if (inBRDMode) {
-        const ok = confirm("Close BRD and lose changes?");
-        if (!ok) return;
-        inBRDMode = false;
-        if (closeBtn) closeBtn.style.display = '';
-        if (backBtn) backBtn.style.display = '';
+        alert("Please complete or submit your BRD first.");
+        return;
       }
+      if (!confirm("If you close now, you will lose the data and you must start from the beginning. Close anyway?")) return;
       isActive ? (stopCall(true), setState("idle")) : hideOverlay();
     }
 

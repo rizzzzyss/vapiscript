@@ -1204,13 +1204,42 @@ backBtn?.addEventListener("click", () => {
           return;
         }
         if (a === "ui_ask_question") {
-          pendingToolCallId = s;
-          pendingToolName = a;
-          const l = o.question_key;
-          if (!l || !QUESTIONS[l]) return;
-          autoFillFromQuestionKey(l);
-          renderQuestionByKey(l);
-          return;
+         pendingToolCallId = s;
+  pendingToolName = a;
+  const l = o.question_key;
+  if (!l || !QUESTIONS[l]) return;
+  
+  // SPECIAL CASE: If question_key is "collect_email", route by service
+  if (l === "collect_email") {
+    console.log("[ToolCall] collect_email question - routing by service");
+    const service = window.__vapiUi.collected?.service;
+    
+    // Consulting → open Calendly
+    if (service === "Consulting") {
+      console.log("[Email Step] Consulting flow → opening Calendly");
+      showCalendlyForConsulting();
+      return;
+    }
+    
+    // All others → generate BRD directly
+    (async () => {
+      try {
+        inBRDMode = true;
+        if (backBtn) backBtn.style.display = "none";
+        setUiProcessing(true);
+        console.log("[Email Step] Non-consulting flow → generating BRD");
+        await generateFullBRD();
+      } catch (err) {
+        console.error("[BRD Generation Error]", err);
+      }
+    })();
+    return;
+  }
+  
+  // For all other questions, proceed normally
+  autoFillFromQuestionKey(l);
+  renderQuestionByKey(l);
+  return;
         }
         if (a === "ui_show_preview" && (o.preview_type || o.category)) {
           pendingToolCallId = s;
@@ -1219,25 +1248,28 @@ backBtn?.addEventListener("click", () => {
           return;
         }
         if (a === "ui_show_email") {
-       /*   pendingToolCallId = s;
-          pendingToolName = a;
-          renderEmailScreen();
-          return;*/
-
-     console.log("[ToolCall] SKIPPED ui_show_email – directly generating BRD");
-
-  // run BRD generation asynchronously (no await here)
+       console.log("[ToolCall] ui_show_email (backup handler) - routing by service");
+  const service = window.__vapiUi.collected?.service;
+  
+  // Consulting → open Calendly
+  if (service === "Consulting") {
+    console.log("[Email Screen] Consulting flow → opening Calendly");
+    showCalendlyForConsulting();
+    return;
+  }
+  
+  // All others → generate BRD directly
   (async () => {
-    inBRDMode = true;
-    if (backBtn) backBtn.style.display = "none";
-    setUiProcessing(true);
     try {
+      inBRDMode = true;
+      if (backBtn) backBtn.style.display = "none";
+      setUiProcessing(true);
+      console.log("[Email Screen] Non-consulting flow → generating BRD");
       await generateFullBRD();
     } catch (err) {
       console.error("[BRD Generation Error]", err);
     }
   })();
-
   return;
         }
         if (a === "ui_close") {

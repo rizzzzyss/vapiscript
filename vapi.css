@@ -2732,3 +2732,53 @@ body.vapi-overlay-open{
     min-height: 38px;
   }
 }
+/* Calendly Screen Styles */
+.vapi-calendly-container {
+  padding: 30px 25px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.vapi-calendly-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #D4AF37;
+}
+
+.vapi-calendly-header-icon {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.vapi-calendly-header-text h2 {
+  margin: 0 0 5px 0;
+  font-size: 24px;
+  color: #333;
+}
+
+.vapi-calendly-header-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.vapi-calendly-widget-wrapper {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.vapi-calendly-footer {
+  text-align: center;
+  padding-top: 15px;
+}
+
+.vapi-calendly-note {
+  margin: 10px 0 0 0;
+  font-size: 12px;
+  color: #999;
+}

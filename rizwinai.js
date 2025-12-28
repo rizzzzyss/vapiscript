@@ -352,7 +352,9 @@
         IDLE_TIMEOUT_MS: 8000,
         IDLE_REMINDER_INTERVAL_MS: 15000,
         USER_SPEAKING_DECAY_MS: 800,
-        AI_SPEAKING_DECAY_MS: 500
+        AI_SPEAKING_DECAY_MS: 500,
+        AUTO_DISCONNECT_IDLE_MS: 30000, // Disconnect after 30 seconds of complete inactivity
+        DISCONNECT_WARNING_MS: 20000 // Warn at 20 seconds
       },
       STATUS_MESSAGES = {
         connecting: "Connecting...",
@@ -486,7 +488,10 @@
       inputAudioLevel: 0,
       isSpeechActive: false,
       speechStartTime: 0,
-      speechCheckInterval: null
+      speechCheckInterval: null,
+      autoDisconnectTimeoutId: null,
+      disconnectWarningTimeoutId: null,
+      lastActivityTime: 0
     };
 
     // ============================================
@@ -640,6 +645,46 @@ function initBRDScrollHint() {
 
     function clearIdleTimer() {
       statusState.idleTimeoutId && (clearTimeout(statusState.idleTimeoutId), statusState.idleTimeoutId = null);
+    }
+
+    function startAutoDisconnectTimer() {
+      clearAutoDisconnectTimer();
+      statusState.lastActivityTime = Date.now();
+      
+      // Warning before disconnect
+      statusState.disconnectWarningTimeoutId = setTimeout(() => {
+        if (statusState.isActive) {
+          showNotification('No activity detected. Call will end in 10 seconds...', 'warning', 10000);
+          updateStatusIndicator("idle", "⚠️ Ending call soon...");
+        }
+      }, STATUS_CONFIG.DISCONNECT_WARNING_MS);
+      
+      // Auto-disconnect
+      statusState.autoDisconnectTimeoutId = setTimeout(() => {
+        if (statusState.isActive) {
+          console.log('[Auto-Disconnect] No activity for 30 seconds, ending call');
+          showNotification('Call ended due to inactivity', 'info', 4000);
+          stopCall(true);
+          setState("idle");
+        }
+      }, STATUS_CONFIG.AUTO_DISCONNECT_MS);
+    }
+
+    function clearAutoDisconnectTimer() {
+      if (statusState.disconnectWarningTimeoutId) {
+        clearTimeout(statusState.disconnectWarningTimeoutId);
+        statusState.disconnectWarningTimeoutId = null;
+      }
+      if (statusState.autoDisconnectTimeoutId) {
+        clearTimeout(statusState.autoDisconnectTimeoutId);
+        statusState.autoDisconnectTimeoutId = null;
+      }
+    }
+
+    function resetAutoDisconnectTimer() {
+      if (statusState.isActive) {
+        startAutoDisconnectTimer();
+      }
     }
 
     function scheduleIdleReminder() {

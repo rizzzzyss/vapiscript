@@ -1324,24 +1324,24 @@
           }
         };
         
-        socket.onerror = (err) => { 
-          console.error('[Socket Error]:', err);
-          if (!isReconnecting) {
-            attemptReconnect();
-          }
-        };
+      socket.onerror = (err) => { 
+  console.error('[Socket Error]:', err);
+  if (!isReconnecting) {
+    attemptReconnect();
+  }
+};
         
-        socket.onclose = (event) => { 
-          console.log('[Socket Close]:', event.code, event.reason);
-          
-          if (event.code !== 1000 && !isReconnecting) {
-            console.log('[Socket] Abnormal close, attempting reconnect');
-            attemptReconnect();
-          } else {
-            stopCall(false);
-            setState("idle");
-          }
-        };
+      socket.onclose = (event) => { 
+  console.log('[Socket Close]:', event.code, event.reason);
+  
+  if (event.code !== 1000 && !isReconnecting) {
+    console.log('[Socket] Abnormal close, attempting reconnect');
+    attemptReconnect();
+  } else {
+    stopCall(false);
+    setState("idle");
+  }
+};
       } catch (error) {
         console.error('[Start Call] Error:', error);
         if (!isReconnecting) {

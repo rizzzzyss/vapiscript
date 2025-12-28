@@ -445,6 +445,11 @@
       successNewBtn = document.getElementById("vapiSuccessNewBtn"),
       successDownloadBtn = document.getElementById("vapiSuccessDownloadBtn");
 
+
+    const screenCalendly = document.getElementById("vapiScreenCalendly"),
+      calendlyWidget = document.getElementById("calendlyWidget"),
+      skipCalendlyBtn = document.getElementById("vapiSkipCalendly"
+
     if (!pill || !icon || !overlay) {
       logError(new Error('Required DOM elements not found'), { context: 'dom_init' });
       console.error('[Vapi] Required DOM elements not found.');
@@ -879,7 +884,7 @@ function initBRDScrollHint() {
         t.disabled = false;
         t.style.opacity = "1";
       });
-      [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess].forEach(t => {
+[screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess, screenCalendly].forEach(t => {
         t && (t.classList.remove("is-active"), t.style.opacity = "1", t.style.pointerEvents = "auto");
       });
 
@@ -1097,7 +1102,7 @@ backBtn?.addEventListener("click", () => {
     // APPROVE BUTTON - TRIGGERS BRD MODE
     // ============================================
 
-    approveBtn?.addEventListener("click", async () => {
+  /*  approveBtn?.addEventListener("click", async () => {
       console.log("[Click] Approving preview - Starting BRD generation");
       
       inBRDMode = true;
@@ -1112,7 +1117,32 @@ backBtn?.addEventListener("click", () => {
       
       await generateFullBRD();
     });
+*/
 
+    approveBtn?.addEventListener("click", async () => {
+  console.log("[Click] Approving preview");
+  
+  const service = window.__vapiUi.collected?.service;
+  
+  // For consulting, show Calendly instead of BRD
+  if (service === "Consulting") {
+    showCalendlyForConsulting();
+    return;
+  }
+  
+  // For other services - existing BRD flow
+  inBRDMode = true;
+  console.log("[BRD Mode] LOCKED");
+  
+  pendingToolCallId = null;
+  pendingToolName = null;
+  
+  if (backBtn) backBtn.style.display = 'none';
+  
+  setUiProcessing(true);
+  
+  await generateFullBRD();
+});
     function renderEmailScreen() {
       if (inBRDMode) {
         console.log("[renderEmailScreen] BLOCKED - in BRD mode");
@@ -1346,6 +1376,79 @@ backBtn?.addEventListener("click", () => {
       const a = e?.type === "transcript";
       return a && i && s ? String(t) : null;
     }
+
+
+
+    function showCalendlyForConsulting() {
+  const collected = window.__vapiUi.collected || {};
+  
+  console.log('[Calendly] Showing Calendly for consulting', collected);
+  
+  // Build URL with user data
+  const params = new URLSearchParams();
+  
+  // Pre-fill email if available
+  if (collected.email) {
+    params.append('email', collected.email);
+  }
+  
+  // Add consulting details as custom answers (a1, a2, a3, a4)
+  if (collected.consulting_topic) {
+    params.append('a1', collected.consulting_topic);
+  }
+  if (collected.consulting_current_situation) {
+    params.append('a2', collected.consulting_current_situation);
+  }
+  if (collected.consulting_desired_outcome) {
+    params.append('a3', collected.consulting_desired_outcome);
+  }
+  if (collected.consulting_urgency) {
+    params.append('a4', collected.consulting_urgency);
+  }
+  
+  const calendlyUrl = `https://calendly.com/rizwinazeez/30min?${params.toString()}`;
+  
+  console.log('[Calendly] Loading with URL:', calendlyUrl);
+  
+  // Show the Calendly screen
+  showScreen(screenCalendly);
+  
+  // Initialize Calendly widget
+  if (window.Calendly) {
+    // Clear previous widget content
+    if (calendlyWidget) {
+      calendlyWidget.innerHTML = '';
+    }
+    
+    // Initialize Calendly inline widget
+    window.Calendly.initInlineWidget({
+      url: calendlyUrl,
+      parentElement: calendlyWidget,
+      prefill: {
+        email: collected.email || '',
+        customAnswers: {
+          a1: collected.consulting_topic || '',
+          a2: collected.consulting_current_situation || '',
+          a3: collected.consulting_desired_outcome || '',
+          a4: collected.consulting_urgency || ''
+        }
+      }
+    });
+    
+    showNotification('Schedule your consulting call', 'info', 3000);
+  } else {
+    console.error('[Calendly] Widget library not loaded yet, retrying...');
+    
+    // Retry after 1 second if Calendly script hasn't loaded
+    setTimeout(() => {
+      if (window.Calendly) {
+        showCalendlyForConsulting();
+      } else {
+        showNotification('Calendar widget failed to load. Please refresh the page.', 'error');
+      }
+    }, 1000);
+  }
+}
 
     async function startCall() {
       setState("loading");
@@ -1632,6 +1735,46 @@ backBtn?.addEventListener("click", () => {
       }
     }
 
+
+    // Skip Calendly button
+skipCalendlyBtn?.addEventListener("click", () => {
+  if (confirm("Skip scheduling for now? You can always book a call later.")) {
+    showNotification('You can schedule a call anytime from our website!', 'info', 5000);
+    hideOverlay();
+    
+    // Reset state
+    window.__vapiUi.collected = {};
+    window.__vapiUi.selected.clear();
+    window.__vapiUi.flow = null;
+    window.__vapiUi.step = null;
+    window.__vapiUi.pendingField = null;
+    window.__vapiUi.lastCategory = null;
+  }
+});
+
+    // Listen for Calendly booking completion
+window.addEventListener('message', function(e) {
+  if (e.data.event && e.data.event.indexOf('calendly') === 0) {
+    if (e.data.event === 'calendly.event_scheduled') {
+      console.log('[Calendly] Event scheduled!', e.data);
+      
+      showNotification('Call scheduled successfully! Check your email for confirmation.', 'success', 5000);
+      
+      // Close overlay after booking
+      setTimeout(() => {
+        hideOverlay();
+        
+        // Reset state
+        window.__vapiUi.collected = {};
+        window.__vapiUi.selected.clear();
+        window.__vapiUi.flow = null;
+        window.__vapiUi.step = null;
+        window.__vapiUi.pendingField = null;
+        window.__vapiUi.lastCategory = null;
+      }, 3000);
+    }
+  }
+});
     function renderBRDViewer() {
       const collected = window.__vapiUi.collected;
       if (brdContent) brdContent.innerHTML = generatedBRD.html;

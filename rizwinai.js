@@ -490,8 +490,10 @@
       speechStartTime: 0,
       speechCheckInterval: null,
       autoDisconnectTimeoutId: null,
-      disconnectWarningTimeoutId: null,
-      lastActivityTime: 0
+      lastUserActivityTime: 0,
+      lastAiActivityTime: 0,
+      lastToolActivityTime: 0,
+      hasShownWarning: false
     };
 
     // ============================================
@@ -647,44 +649,83 @@ function initBRDScrollHint() {
       statusState.idleTimeoutId && (clearTimeout(statusState.idleTimeoutId), statusState.idleTimeoutId = null);
     }
 
-    function startAutoDisconnectTimer() {
-      clearAutoDisconnectTimer();
-      statusState.lastActivityTime = Date.now();
+    // ============================================
+    // ACTIVITY-BASED AUTO-DISCONNECT
+    // ============================================
+
+    // Check if call is truly idle (no activity on any channel)
+    function checkInactivity() {
+      if (!statusState.isActive) return;
       
-      // Warning before disconnect
-      statusState.disconnectWarningTimeoutId = setTimeout(() => {
-        if (statusState.isActive) {
-          showNotification('No activity detected. Call will end in 10 seconds...', 'warning', 10000);
-          updateStatusIndicator("idle", "⚠️ Ending call soon...");
-        }
-      }, STATUS_CONFIG.DISCONNECT_WARNING_MS);
+      const now = Date.now();
+      const timeSinceUserActivity = now - statusState.lastUserActivityTime;
+      const timeSinceAiActivity = now - statusState.lastAiActivityTime;
+      const timeSinceToolActivity = now - statusState.lastToolActivityTime;
       
-      // Auto-disconnect
-      statusState.autoDisconnectTimeoutId = setTimeout(() => {
-        if (statusState.isActive) {
-          console.log('[Auto-Disconnect] No activity for 30 seconds, ending call');
-          showNotification('Call ended due to inactivity', 'info', 4000);
-          stopCall(true);
-          setState("idle");
-        }
-      }, STATUS_CONFIG.AUTO_DISCONNECT_MS);
+      // Find the most recent activity across all channels
+      const lastActivity = Math.min(timeSinceUserActivity, timeSinceAiActivity, timeSinceToolActivity);
+      
+      // Show warning at 20 seconds of complete inactivity
+      if (lastActivity >= STATUS_CONFIG.DISCONNECT_WARNING_MS && !statusState.hasShownWarning) {
+        statusState.hasShownWarning = true;
+        const remainingSeconds = Math.ceil((STATUS_CONFIG.AUTO_DISCONNECT_IDLE_MS - lastActivity) / 1000);
+        showNotification(
+          `No activity detected. Call will end in ${remainingSeconds} seconds...`, 
+          'warning', 
+          (STATUS_CONFIG.AUTO_DISCONNECT_IDLE_MS - lastActivity)
+        );
+        updateStatusIndicator("idle", "⚠️ Ending call soon...");
+      }
+      
+      // Disconnect at 30 seconds of complete inactivity
+      if (lastActivity >= STATUS_CONFIG.AUTO_DISCONNECT_IDLE_MS) {
+        console.log('[Auto-Disconnect] No activity for 30 seconds:', {
+          userIdle: timeSinceUserActivity,
+          aiIdle: timeSinceAiActivity,
+          toolIdle: timeSinceToolActivity
+        });
+        showNotification('Call ended due to inactivity', 'info', 4000);
+        stopCall(true);
+        setState("idle");
+      }
     }
 
-    function clearAutoDisconnectTimer() {
-      if (statusState.disconnectWarningTimeoutId) {
-        clearTimeout(statusState.disconnectWarningTimeoutId);
-        statusState.disconnectWarningTimeoutId = null;
-      }
+    function startActivityMonitoring() {
+      clearActivityMonitoring();
+      
+      const now = Date.now();
+      statusState.lastUserActivityTime = now;
+      statusState.lastAiActivityTime = now;
+      statusState.lastToolActivityTime = now;
+      statusState.hasShownWarning = false;
+      
+      // Check inactivity every 2 seconds
+      statusState.autoDisconnectTimeoutId = setInterval(() => {
+        checkInactivity();
+      }, 2000);
+    }
+
+    function clearActivityMonitoring() {
       if (statusState.autoDisconnectTimeoutId) {
-        clearTimeout(statusState.autoDisconnectTimeoutId);
+        clearInterval(statusState.autoDisconnectTimeoutId);
         statusState.autoDisconnectTimeoutId = null;
       }
+      statusState.hasShownWarning = false;
     }
 
-    function resetAutoDisconnectTimer() {
-      if (statusState.isActive) {
-        startAutoDisconnectTimer();
-      }
+    function recordUserActivity() {
+      statusState.lastUserActivityTime = Date.now();
+      statusState.hasShownWarning = false; // Reset warning flag
+    }
+
+    function recordAiActivity() {
+      statusState.lastAiActivityTime = Date.now();
+      statusState.hasShownWarning = false; // Reset warning flag
+    }
+
+    function recordToolActivity() {
+      statusState.lastToolActivityTime = Date.now();
+      statusState.hasShownWarning = false; // Reset warning flag
     }
 
     function scheduleIdleReminder() {
@@ -699,7 +740,7 @@ function initBRDScrollHint() {
     }
 
     function hideStatusIndicator() {
-      statusIndicator && (statusIndicator.style.display = "none", statusState.isActive = false, clearIdleTimer(), stopVADCheck(), document.body.classList.remove("vapi-call-active"));
+      statusIndicator && (statusIndicator.style.display = "none", statusState.isActive = false, clearIdleTimer(), clearActivityMonitoring(), stopVADCheck(), document.body.classList.remove("vapi-call-active"));
     }
 
     // ============================================
@@ -743,6 +784,7 @@ function initBRDScrollHint() {
 
     function onUserSpeechDetected() {
       window.vapiIsSpeaking || statusState.current !== "userSpeaking" && updateStatusIndicator("userSpeaking");
+      recordUserActivity(); // Record user activity
     }
 
     function onUserSpeechEnded() {
@@ -752,6 +794,7 @@ function initBRDScrollHint() {
     function onAiSpeechStarted() {
       statusState.lastAiSpeechTime = Date.now();
       updateStatusIndicator("aiSpeaking");
+      recordAiActivity(); // Record AI activity
     }
 
     function onAiSpeechEnded() {
@@ -810,13 +853,20 @@ function initBRDScrollHint() {
     }
 
     function attemptCloseOverlay() {
+  // BRD mode has special handling
   if (inBRDMode) {
     const ok = confirm("Close BRD and lose changes?");
     if (!ok) return;
     inBRDMode = false;
     if (closeBtn) closeBtn.style.display = '';
     if (backBtn) backBtn.style.display = '';
+  } else {
+    // Normal screens - warn about data loss
+    if (!confirm("If you close now, you will lose the data and you must start from the beginning. Close anyway?")) {
+      return;
+    }
   }
+  
   isActive ? (stopCall(true), setState("idle")) : hideOverlay();
 }
 
@@ -952,6 +1002,7 @@ backBtn?.addEventListener("click", () => {
         s.className = "vapi-cardbtn";
         s.textContent = n;
         s.addEventListener("click", async () => {
+          recordUserActivity(); // Record user interaction
           if (window.__vapiUi.mode === "multi") {
             window.__vapiUi.selected.has(n) ? window.__vapiUi.selected.delete(n) : window.__vapiUi.selected.size < window.__vapiUi.max && window.__vapiUi.selected.add(n);
             s.classList.toggle("is-selected", window.__vapiUi.selected.has(n));
@@ -973,6 +1024,7 @@ backBtn?.addEventListener("click", () => {
     }
 
     confirmMultiBtn?.addEventListener("click", async () => {
+      recordUserActivity(); // Record user interaction
       const e = Array.from(window.__vapiUi.selected);
       if (!e.length) return;
       const t = window.__vapiUi.pendingField;
@@ -984,6 +1036,7 @@ backBtn?.addEventListener("click", () => {
     });
 
     sendEmailBtn?.addEventListener("click", async () => {
+      recordUserActivity(); // Record user interaction
       const e = String(emailInput?.value || "").trim();
       if (!e) return;
       setCollected("email", e);
@@ -1006,6 +1059,7 @@ backBtn?.addEventListener("click", () => {
     }
 
     submitTextBtn?.addEventListener("click", async () => {
+      recordUserActivity(); // Record user interaction
       const e = String(textInput?.value || "").trim();
       if (!e) return;
       const t = window.__vapiUi.pendingField;
@@ -1093,6 +1147,9 @@ backBtn?.addEventListener("click", () => {
     function handleToolCalls(e) {
       const t = e?.message ?? e,
         n = t?.toolCallList ?? t?.toolCalls ?? [];
+      
+      recordToolActivity(); // Record tool activity
+      
       n.forEach(i => {
         const s = i?.id || i?.toolCallId || i?.tool_call_id,
           a = i?.function?.name || i?.name;
@@ -1360,6 +1417,7 @@ backBtn?.addEventListener("click", () => {
             setState("active");
             updateStatusIndicator("listening");
             updateAudioLevel();
+            startActivityMonitoring(); // Start activity-based auto-disconnect monitoring
             
             showNotification("Connected successfully", 'success', 2000);
             
@@ -1428,6 +1486,7 @@ backBtn?.addEventListener("click", () => {
       window.vapiIsSpeaking = false;
       isActive = false;
       stopVADCheck();
+      clearActivityMonitoring(); // Clear activity monitoring
       
       try { 
         e && socket?.readyState === WebSocket.OPEN && socket.send(JSON.stringify({ type: "end-call" })); 

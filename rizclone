@@ -476,6 +476,12 @@
       workletNode,
       source;
 
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY = 2000;
+let isReconnecting = false;
+let wasUserInitiated = false;
+
     const AI_LEVEL_START = .055,
       AI_LEVEL_END = .03,
       AI_END_HOLD_MS = 450;
@@ -1410,6 +1416,137 @@ backBtn?.addEventListener("click", () => {
       }
     }
 
+
+
+async function handleUnexpectedDisconnect() {
+  isReconnecting = true;
+  reconnectAttempts++;
+  
+  console.log(`[Reconnect] Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`);
+  
+  showNotification(
+    `Connection lost. Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
+    'warning',
+    RECONNECT_DELAY
+  );
+  
+  updateStatusIndicator("connecting", "Reconnecting...");
+  
+  // Wait before reconnecting
+  await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY * reconnectAttempts));
+  
+  // Check if user hasn't manually stopped during wait
+  if (!isActive) {
+    isReconnecting = false;
+    return;
+  }
+  
+  try {
+    // Close old socket if still open
+    if (socket && socket.readyState !== WebSocket.CLOSED) {
+      socket.close();
+    }
+    
+    // Try to reconnect
+    const wsUrl = await createWebsocketCallUrl();
+    socket = new WebSocket(wsUrl);
+    socket.binaryType = "arraybuffer";
+    
+    const connectionTimeout = setTimeout(() => {
+      if (socket?.readyState !== WebSocket.OPEN) {
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+          handleUnexpectedDisconnect();
+        } else {
+          showNotification("Unable to reconnect. Please try again later.", 'error', 5000);
+          stopCall(false);
+          setState("idle");
+          hideStatusIndicator();
+          isReconnecting = false;
+        }
+      }
+    }, AUDIO_CONFIG.connectionTimeoutMs);
+    
+    // Reattach handlers
+    socket.onopen = async () => {
+      clearTimeout(connectionTimeout);
+      isReconnecting = false;
+      reconnectAttempts = 0;
+      
+      showNotification('Reconnected successfully!', 'success', 2000);
+      updateStatusIndicator("listening");
+      
+      // Reconnect worklet to new socket
+      if (workletNode && workletNode.port) {
+        workletNode.port.onmessage = msg => { 
+          socket?.readyState === WebSocket.OPEN && socket.send(msg.data); 
+          processAudioForVAD(msg.data); 
+        };
+      }
+    };
+    
+    socket.onmessage = async msg => {
+      try {
+        if (msg.data instanceof ArrayBuffer) { 
+          const pcm = new Int16Array(msg.data); 
+          pcm.length > 0 && playPcm16(pcm, AUDIO_CONFIG.outputSampleRate); 
+          return; 
+        }
+        
+        const processMessage = message => {
+          let parsed;
+          try { parsed = JSON.parse(message); } catch { return; }
+          const content = parsed?.message ?? parsed;
+          if (content?.type === "tool-calls") { 
+            handleToolCalls(parsed); 
+            return; 
+          }
+          const transcript = extractTranscriptMessage(content);
+          transcript && applyVoiceToUI(transcript);
+        };
+        
+        if (typeof msg.data == "string") return processMessage(msg.data);
+        if (msg.data instanceof Blob) {
+          try { 
+            processMessage(await msg.data.text()); 
+          } catch (err) {
+            logError(err, { context: 'blob_text' });
+          }
+        }
+      } catch (error) {
+        logError(error, { context: 'websocket_onmessage' });
+      }
+    };
+    
+    socket.onerror = (error) => { 
+      logError(new Error('WebSocket error during reconnect'), { context: 'websocket_onerror_reconnect', error });
+    };
+    
+    socket.onclose = (event) => {
+      if (!event.wasClean && isActive && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        handleUnexpectedDisconnect();
+      } else {
+        stopCall(false);
+        setState("idle");
+        isReconnecting = false;
+      }
+    };
+    
+  } catch (error) {
+    logError(error, { context: 'reconnect_attempt' });
+    
+    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      handleUnexpectedDisconnect();
+    } else {
+      showNotification("Failed to reconnect. Please start a new call.", 'error', 5000);
+      stopCall(false);
+      setState("idle");
+      hideStatusIndicator();
+      isReconnecting = false;
+    }
+  }
+}
+
+
     function createWorkletProcessorBlob() {
       const e = `class VapiAudioProcessor extends AudioWorkletProcessor{constructor(){super();this.bufferSize=${AUDIO_CONFIG.workletBufferSize};this.buffer=new Float32Array(this.bufferSize);this.bufferIndex=0;this.inputSampleRate=sampleRate;this.outputSampleRate=16000;this.needsResampling=Math.abs(this.inputSampleRate-this.outputSampleRate)>100}resample(input){if(!this.needsResampling)return input;const ratio=this.inputSampleRate/this.outputSampleRate;const len=Math.floor(input.length/ratio);const out=new Float32Array(len);for(let i=0;i<len;i++){const idx=i*ratio;const f=Math.floor(idx);const c=Math.min(f+1,input.length-1);out[i]=input[f]*(1-(idx-f))+input[c]*(idx-f)}return out}floatTo16BitPCM(arr){const out=new Int16Array(arr.length);for(let i=0;i<arr.length;i++){const s=Math.max(-1,Math.min(1,arr[i]));out[i]=s<0?s*32768:s*32767}return out}process(inputs){const input=inputs[0];if(!input||!input[0])return true;for(let i=0;i<input[0].length;i++){this.buffer[this.bufferIndex++]=input[0][i];if(this.bufferIndex>=this.bufferSize){const resampled=this.resample(this.buffer);const pcm=this.floatTo16BitPCM(resampled);this.port.postMessage(pcm.buffer,[pcm.buffer]);this.bufferIndex=0;this.buffer=new Float32Array(this.bufferSize)}}return true}}registerProcessor('vapi-audio-processor',VapiAudioProcessor);`;
       return URL.createObjectURL(new Blob([e], { type: "application/javascript" }));
@@ -1530,7 +1667,11 @@ backBtn?.addEventListener("click", () => {
         socket.onopen = async () => {
           try {
             clearTimeout(connectionTimeout);
-            
+            reconnectAttempts = 0;
+    isReconnecting = false;
+    if (reconnectAttempts > 0) {
+      showNotification('Reconnected successfully!', 'success', 2000);
+    }
             stream = await initAudioSafely(async () => {
               return await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -1619,10 +1760,28 @@ backBtn?.addEventListener("click", () => {
           setState("idle"); 
         };
         
-        socket.onclose = () => { 
-          stopCall(false); 
-          setState("idle"); 
-        };
+      socket.onclose = (event) => { 
+  console.log('[WebSocket] Connection closed', {
+    code: event.code,
+    reason: event.reason,
+    wasClean: event.wasClean,
+    wasUserInitiated,
+    isActive
+  });
+  
+  // Check if this was a user-initiated close (normal closure)
+  const isNormalClosure = event.code === 1000 || wasUserInitiated;
+  
+  // If unexpected disconnect and still active, try to reconnect
+  if (!isNormalClosure && isActive && !isReconnecting && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    handleUnexpectedDisconnect();
+    return;
+  }
+  
+  // Otherwise, stop the call normally
+  stopCall(false);
+  setState("idle");
+};
         
       } catch (error) {
         logError(error, { context: 'start_call' });
@@ -1633,6 +1792,7 @@ backBtn?.addEventListener("click", () => {
     }
 
     function stopCall(e = true) {
+  wasUserInitiated = true;
       window.vapiAudioLevel = 0;
       window.vapiIsSpeaking = false;
       isActive = false;
@@ -1653,11 +1813,16 @@ backBtn?.addEventListener("click", () => {
       
       socket = stream = audioContext = workletNode = source = null;
       nextPlayTime = 0;
-      pendingToolCallId = null;
-      pendingToolName = null;
-      pillWrap ? pillWrap.style.transform = "translateX(-50%) scale(1)" : pill.style.transform = "scale(1)";
-      if (!inBRDMode) hideOverlay();
-      hideStatusIndicator();
+   pendingToolCallId = null;
+  pendingToolName = null;
+  reconnectAttempts = 0; // NEW LINE
+  isReconnecting = false; // NEW LINE
+  
+  setTimeout(() => { wasUserInitiated = false; }, 1000); // NEW LINE
+  
+  pillWrap ? pillWrap.style.transform = "translateX(-50%) scale(1)" : pill.style.transform = "scale(1)";
+  if (!inBRDMode) hideOverlay();
+  hideStatusIndicator();
     }
 
     function setUiProcessing(e) {
@@ -2127,8 +2292,23 @@ function stripHtmlWrapper(html) {
       getErrorLog: () => errorLog,
       clearErrorLog: () => errorLog.length = 0
     };
+// Add before the last closing bracket of init()
 
+window.addEventListener('online', () => {
+  console.log('[Network] Back online');
+  if (isReconnecting) {
+    showNotification('Internet restored. Reconnecting...', 'info', 2000);
+  }
+});
+
+window.addEventListener('offline', () => {
+  console.log('[Network] Gone offline');
+  if (isActive) {
+    showNotification('Internet connection lost', 'warning', 3000);
+  }
+});
     console.log('[Vapi] Voice assistant initialized with error handling!');
+  
   }
 
   if (document.readyState === 'loading') {

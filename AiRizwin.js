@@ -1219,10 +1219,17 @@ backBtn?.addEventListener("click", () => {
           return;
         }
         if (a === "ui_show_email") {
-          pendingToolCallId = s;
+       /*   pendingToolCallId = s;
           pendingToolName = a;
           renderEmailScreen();
-          return;
+          return;*/
+
+            console.log("[ToolCall] SKIPPED ui_show_email – directly generating BRD");
+  inBRDMode = true;
+  if (backBtn) backBtn.style.display = "none";
+  setUiProcessing(true);
+  await generateFullBRD();  // goes straight to generation without preview
+  return;
         }
         if (a === "ui_close") {
           hideOverlay();

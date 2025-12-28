@@ -58,6 +58,15 @@
     };
 
     // ============================================
+    // RECONNECTION CONFIG
+    // ============================================
+    
+    const RECONNECT_CONFIG = {
+      maxAttempts: 3,
+      delayMs: 2000
+    };
+
+    // ============================================
     // PERFORMANCE & ERROR HANDLING HELPERS
     // ============================================
     
@@ -165,7 +174,9 @@
       analyser,
       analyserData,
       isActive = false,
-      isConnecting = false, // NEW: Prevent duplicate connections
+      isConnecting = false,
+      isReconnecting = false,
+      reconnectAttempt = 0,
       aiLastLoudAt = 0,
       stream,
       audioContext,
@@ -211,89 +222,157 @@
       downloadUrl: null
     };
 
-
-const wrap = document.getElementById("vapi-ws-pill");
-const btn  = document.getElementById("vapiCallBtn");
-
-// Guard against duplicate handlers if btn === pill
-let pillOpenHandled = false;
-
-btn?.addEventListener("click", (e) => {
-  // Prevent double-firing if btn is same as pill
-  if (btn === pill) {
-    if (pillOpenHandled) {
-      pillOpenHandled = false;
-      return;
-    }
-  }
-  wrap?.classList.add("is-open");
-});
-
-document.getElementById('vapiSuccessCloseBtn')?.addEventListener('click', () => {
-  // Stop any active call first to prevent leaks
-  if (isActive) {
-    stopCall(false);
-    setState("idle");
-  }
-  
-  inBRDMode = false;
-  
-  window.__vapiUi.collected = {};
-  window.__vapiUi.selected.clear();
-  window.__vapiUi.flow = null;
-  window.__vapiUi.step = null;
-  window.__vapiUi.pendingField = null;
-  window.__vapiUi.lastCategory = null;
-  
-  generatedBRD = { 
-    originalHtml: "", 
-    html: "", 
-    designImageBase64: null, 
-    designImageUrl: null, 
-    designSource: null, 
-    userUploadedImageBase64: null, 
-    userUploadedImageName: null, 
-    pdfBase64: null, 
-    pdfBlob: null, 
-    pdfFilename: null,
-    downloadUrl: null
-  };
-  
-  overlay.classList.remove('is-open');
-  overlay.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('vapi-overlay-open');
-  
-  [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess].forEach(s => {
-    if (s) s.classList.remove('is-active');
-  });
-  
-  if (closeBtn) closeBtn.style.display = '';
-  if (backBtn) backBtn.style.display = '';
-});
-
-
-function initBRDScrollHint() {
-  const card = document.getElementById('vapiCard');
-  const hint = document.getElementById('scrollHint');
-  
-  if (!card || !hint) return;
-  
-  hint.style.opacity = '1';
-  
-  setTimeout(() => {
-    card.scrollTo({ top: 80, behavior: 'smooth' });
-    setTimeout(() => {
-      card.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 800);
-  }, 500);
-  
-  // Use addEventListener instead of onscroll property to avoid overwriting
-  card.addEventListener('scroll', function() {
-    const isAtBottom = this.scrollHeight - this.scrollTop <= this.clientHeight + 100;
-    hint.style.opacity = isAtBottom ? '0' : '1';
-  });
-}
+    // ============================================
+    // RECONNECT NOTIFICATION DOM
+    // ============================================
     
+    let reconnectNotification = null;
+    
+    function createReconnectNotification() {
+      if (reconnectNotification) return reconnectNotification;
+      
+      const notif = document.createElement('div');
+      notif.className = 'vapi-reconnect-notification';
+      notif.innerHTML = `
+        <div class="vapi-reconnect-content">
+          <div class="vapi-reconnect-spinner"></div>
+          <div class="vapi-reconnect-icon">🔄</div>
+          <h3 class="vapi-reconnect-title">Reconnecting...</h3>
+          <p class="vapi-reconnect-message">Attempting to restore connection</p>
+          <button type="button" class="vapi-reconnect-close-btn" style="display:none;">Close</button>
+        </div>
+      `;
+      
+      document.body.appendChild(notif);
+      reconnectNotification = notif;
+      
+      const closeBtn = notif.querySelector('.vapi-reconnect-close-btn');
+      closeBtn?.addEventListener('click', () => {
+        hideReconnectNotification();
+        stopCall(false);
+        setState("idle");
+        hideOverlay();
+      });
+      
+      return notif;
+    }
+    
+    function showReconnectNotification(state = 'reconnecting') {
+      const notif = createReconnectNotification();
+      const spinner = notif.querySelector('.vapi-reconnect-spinner');
+      const icon = notif.querySelector('.vapi-reconnect-icon');
+      const title = notif.querySelector('.vapi-reconnect-title');
+      const message = notif.querySelector('.vapi-reconnect-message');
+      const closeBtn = notif.querySelector('.vapi-reconnect-close-btn');
+      
+      notif.className = 'vapi-reconnect-notification is-visible';
+      
+      if (state === 'reconnecting') {
+        notif.classList.add('state-reconnecting');
+        if (spinner) spinner.style.display = 'block';
+        if (icon) icon.style.display = 'none';
+        if (title) title.textContent = 'Reconnecting...';
+        if (message) message.textContent = `Attempt ${reconnectAttempt} of ${RECONNECT_CONFIG.maxAttempts}`;
+        if (closeBtn) closeBtn.style.display = 'none';
+      } else if (state === 'failed') {
+        notif.classList.add('state-failed');
+        if (spinner) spinner.style.display = 'none';
+        if (icon) {
+          icon.style.display = 'block';
+          icon.textContent = '❌';
+        }
+        if (title) title.textContent = 'Connection Failed';
+        if (message) message.textContent = 'Rizwin clone can\'t respond right now';
+        if (closeBtn) closeBtn.style.display = 'inline-block';
+      }
+    }
+    
+    function hideReconnectNotification() {
+      if (reconnectNotification) {
+        reconnectNotification.classList.remove('is-visible');
+      }
+    }
+
+    // ============================================
+    // EXISTING CODE (UNCHANGED)
+    // ============================================
+
+    const wrap = document.getElementById("vapi-ws-pill");
+    const btn  = document.getElementById("vapiCallBtn");
+
+    let pillOpenHandled = false;
+
+    btn?.addEventListener("click", (e) => {
+      if (btn === pill) {
+        if (pillOpenHandled) {
+          pillOpenHandled = false;
+          return;
+        }
+      }
+      wrap?.classList.add("is-open");
+    });
+
+    document.getElementById('vapiSuccessCloseBtn')?.addEventListener('click', () => {
+      if (isActive) {
+        stopCall(false);
+        setState("idle");
+      }
+      
+      inBRDMode = false;
+      
+      window.__vapiUi.collected = {};
+      window.__vapiUi.selected.clear();
+      window.__vapiUi.flow = null;
+      window.__vapiUi.step = null;
+      window.__vapiUi.pendingField = null;
+      window.__vapiUi.lastCategory = null;
+      
+      generatedBRD = { 
+        originalHtml: "", 
+        html: "", 
+        designImageBase64: null, 
+        designImageUrl: null, 
+        designSource: null, 
+        userUploadedImageBase64: null, 
+        userUploadedImageName: null, 
+        pdfBase64: null, 
+        pdfBlob: null, 
+        pdfFilename: null,
+        downloadUrl: null
+      };
+      
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('vapi-overlay-open');
+      
+      [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess].forEach(s => {
+        if (s) s.classList.remove('is-active');
+      });
+      
+      if (closeBtn) closeBtn.style.display = '';
+      if (backBtn) backBtn.style.display = '';
+    });
+
+    function initBRDScrollHint() {
+      const card = document.getElementById('vapiCard');
+      const hint = document.getElementById('scrollHint');
+      
+      if (!card || !hint) return;
+      
+      hint.style.opacity = '1';
+      
+      setTimeout(() => {
+        card.scrollTo({ top: 80, behavior: 'smooth' });
+        setTimeout(() => {
+          card.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 800);
+      }, 500);
+      
+      card.addEventListener('scroll', function() {
+        const isAtBottom = this.scrollHeight - this.scrollTop <= this.clientHeight + 100;
+        hint.style.opacity = isAtBottom ? '0' : '1';
+      });
+    }
     
     // ============================================
     // STATUS INDICATOR FUNCTIONS
@@ -1095,6 +1174,49 @@ function initBRDScrollHint() {
       }
     }
 
+    // ============================================
+    // RECONNECTION LOGIC
+    // ============================================
+
+    async function attemptReconnect() {
+      if (isReconnecting) {
+        console.log('[Reconnect] Already reconnecting, skipping');
+        return;
+      }
+      
+      if (reconnectAttempt >= RECONNECT_CONFIG.maxAttempts) {
+        console.log('[Reconnect] Max attempts reached, showing failure notification');
+        showReconnectNotification('failed');
+        return;
+      }
+      
+      isReconnecting = true;
+      reconnectAttempt++;
+      
+      console.log(`[Reconnect] Attempt ${reconnectAttempt}/${RECONNECT_CONFIG.maxAttempts}`);
+      showReconnectNotification('reconnecting');
+      
+      await new Promise(resolve => setTimeout(resolve, RECONNECT_CONFIG.delayMs));
+      
+      try {
+        await startCall();
+        
+        console.log('[Reconnect] Success!');
+        hideReconnectNotification();
+        reconnectAttempt = 0;
+        isReconnecting = false;
+      } catch (error) {
+        console.error('[Reconnect] Failed:', error);
+        isReconnecting = false;
+        
+        if (reconnectAttempt < RECONNECT_CONFIG.maxAttempts) {
+          await attemptReconnect();
+        } else {
+          showReconnectNotification('failed');
+        }
+      }
+    }
+
     async function startCall() {
       if (isConnecting) {
         console.warn('[Vapi] Already connecting, ignoring duplicate request');
@@ -1104,7 +1226,6 @@ function initBRDScrollHint() {
       try {
         isConnecting = true;
         
-        // Close existing socket if any (memory leak prevention)
         if (socket) {
           console.warn('[Vapi] Closing existing socket before new connection');
           try {
@@ -1129,15 +1250,16 @@ function initBRDScrollHint() {
         socket.binaryType = "arraybuffer";
         const t = setTimeout(() => {
           if (socket?.readyState !== WebSocket.OPEN) {
+            console.log('[Vapi] Connection timeout, will attempt reconnect');
             stopCall(false);
-            setState("idle");
-            hideStatusIndicator();
-            alert("Connection timeout.");
+            attemptReconnect();
           }
         }, AUDIO_CONFIG.connectionTimeoutMs);
+        
         socket.onopen = async () => {
           try {
             clearTimeout(t);
+            reconnectAttempt = 0;
             stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
             try { window.stopHandMode?.(); } catch (err) { console.warn('[HAND] stopHandMode failed', err); }
 
@@ -1172,6 +1294,7 @@ function initBRDScrollHint() {
             alert('Failed to access microphone: ' + error.message);
           }
         };
+        
         socket.onmessage = async n => {
           try {
             if (n.data instanceof ArrayBuffer) { 
@@ -1200,20 +1323,30 @@ function initBRDScrollHint() {
             console.error('[Socket Message] Error:', error);
           }
         };
+        
         socket.onerror = (err) => { 
           console.error('[Socket Error]:', err);
-          stopCall(false); 
-          setState("idle"); 
+          if (!isReconnecting) {
+            attemptReconnect();
+          }
         };
+        
         socket.onclose = (event) => { 
           console.log('[Socket Close]:', event.code, event.reason);
-          stopCall(false); 
-          setState("idle"); 
+          
+          if (event.code !== 1000 && !isReconnecting) {
+            console.log('[Socket] Abnormal close, attempting reconnect');
+            attemptReconnect();
+          } else {
+            stopCall(false);
+            setState("idle");
+          }
         };
       } catch (error) {
         console.error('[Start Call] Error:', error);
-        stopCall(false);
-        setState("idle");
+        if (!isReconnecting) {
+          attemptReconnect();
+        }
         throw error;
       } finally {
         isConnecting = false;
@@ -1237,7 +1370,11 @@ function initBRDScrollHint() {
         pendingToolCallId = null;
         pendingToolName = null;
         pillWrap ? pillWrap.style.transform = "translateX(-50%) scale(1)" : pill.style.transform = "scale(1)";
-        if (!inBRDMode) hideOverlay();
+        
+        if (!inBRDMode && !isReconnecting) {
+          hideOverlay();
+        }
+        
         hideStatusIndicator();
       } catch (error) {
         console.error('[Stop Call] Error:', error);
@@ -1257,7 +1394,6 @@ function initBRDScrollHint() {
     }
 
     pill.addEventListener("click", async () => {
-      // Mark as handled if pill === btn to prevent duplicate firing
       if (pill === btn) {
         pillOpenHandled = true;
       }
@@ -1269,6 +1405,9 @@ function initBRDScrollHint() {
       
       try { 
         if (isActive) {
+          reconnectAttempt = 0;
+          isReconnecting = false;
+          hideReconnectNotification();
           stopCall(true);
         } else {
           await startCall();
@@ -1396,7 +1535,6 @@ function initBRDScrollHint() {
         }
         showScreen(screenBRD);
         
-        // Initialize scroll hint after screen is shown
         setTimeout(() => {
           initBRDScrollHint();
         }, 100);
@@ -1662,10 +1800,12 @@ function initBRDScrollHint() {
       testPDFContent: () => buildPDFContent(),
       getSocketState: () => socket?.readyState,
       isConnecting: () => isConnecting,
-      forceStopCall: () => stopCall(true)
+      forceStopCall: () => stopCall(true),
+      getReconnectState: () => ({ isReconnecting, reconnectAttempt }),
+      forceReconnect: () => attemptReconnect()
     };
 
-    console.log('[Vapi] Voice assistant initialized with error handling & memory leak prevention!');
+    console.log('[Vapi] Voice assistant initialized with reconnection logic!');
   }
 
   if (document.readyState === 'loading') {

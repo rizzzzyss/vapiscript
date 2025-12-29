@@ -577,60 +577,64 @@
     this.lastServerActivity = Date.now();
   }
 
-  async sendToolResult(data) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      console.warn('[ToolManager] Socket not ready');
-      return;
-    }
-
-    const toolCallId = pendingToolCallId;
-    if (!toolCallId) {
-      sendAsUserMessage(typeof data === "string" ? data : data.value || data.userInput || JSON.stringify(data));
-      return;
-    }
-
-    const result = typeof data === "string" ? data : JSON.stringify(data);
-    const messageId = `${toolCallId}-${Date.now()}`;
-    
-    this.currentMessageId = messageId;
-    this.pendingCalls.set(messageId, {
-      toolCallId,
-      result,
-      timestamp: Date.now(),
-      resolved: false,
-      ackReceived: false
-    });
-
-    console.log('[ToolManager] Sending tool result:', { messageId, toolCallId });
-    
-    try {
-      await this.sendWithRetry(messageId, result, toolCallId, 1);
-      
-      // ✅ SUCCESS: Clean up after successful send
-      console.log('[ToolManager] Tool result processed successfully');
-      this.pendingCalls.delete(messageId);
-      
-      // ✅ Don't clear pendingToolCallId here - let handleToolCalls do it
-      
-    } catch (error) {
-      console.error('[ToolManager] Failed after all retries:', error);
-      hideProcessing();
-      
-      const call = this.pendingCalls.get(messageId);
-      if (call?.ackReceived) {
-        console.log('[ToolManager] ACK was received - assuming success');
-        this.pendingCalls.delete(messageId);
-      } else {
-        showNotification('Failed to process request. Please try again.', 'error', 5000);
-        
-        // ✅ Clean up on failure
-        pendingToolCallId = null;
-        pendingToolName = null;
-        this.pendingCalls.delete(messageId);
-      }
-    }
+ async sendToolResult(data) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.warn('[ToolManager] Socket not ready');
+    return;
   }
 
+  const toolCallId = pendingToolCallId;
+  if (!toolCallId) {
+    sendAsUserMessage(typeof data === "string" ? data : data.value || data.userInput || JSON.stringify(data));
+    return;
+  }
+
+  const result = typeof data === "string" ? data : JSON.stringify(data);
+  const messageId = `${toolCallId}-${Date.now()}`;
+  
+  this.currentMessageId = messageId;
+  this.pendingCalls.set(messageId, {
+    toolCallId,
+    result,
+    timestamp: Date.now(),
+    resolved: false,
+    ackReceived: false
+  });
+
+  console.log('[ToolManager] Sending tool result:', { messageId, toolCallId });
+  
+  try {
+    await this.sendWithRetry(messageId, result, toolCallId, 1);
+    
+    // ✅ SUCCESS: Clean up after successful send
+    console.log('[ToolManager] Tool result processed successfully');
+    this.pendingCalls.delete(messageId);
+    
+    // ✅ CRITICAL: Hide processing loader
+    hideProcessing();
+    
+    // ✅ Don't clear pendingToolCallId here - let handleToolCalls do it
+    
+  } catch (error) {
+    console.error('[ToolManager] Failed after all retries:', error);
+    
+    // ✅ Hide loader on error too
+    hideProcessing();
+    
+    const call = this.pendingCalls.get(messageId);
+    if (call?.ackReceived) {
+      console.log('[ToolManager] ACK was received - assuming success');
+      this.pendingCalls.delete(messageId);
+    } else {
+      showNotification('Failed to process request. Please try again.', 'error', 5000);
+      
+      // ✅ Clean up on failure
+      pendingToolCallId = null;
+      pendingToolName = null;
+      this.pendingCalls.delete(messageId);
+    }
+  }
+}
   async sendWithRetry(messageId, result, toolCallId, attempt) {
     console.log(`[ToolManager] Attempt ${attempt}/${this.config.maxRetries + 1} for ${messageId}`);
     
@@ -706,9 +710,10 @@
     
     const timeoutId = setTimeout(() => {
       console.warn('[ToolManager] Response timeout for:', messageId);
-      hideProcessing();
       
-      // ✅ CRITICAL: Check one more time before failing
+      // ✅ REMOVED: hideProcessing() - now handled in sendToolResult
+      
+      // ✅ Check one more time before failing
       const finalCall = this.pendingCalls.get(messageId);
       if (finalCall?.ackReceived || finalCall?.resolved) {
         console.log('[ToolManager] Late success detected in timeout handler');
@@ -785,7 +790,7 @@
         return;
       }
       
-    }, 150); // Check every 150ms
+    }, 150);
   });
 }
 

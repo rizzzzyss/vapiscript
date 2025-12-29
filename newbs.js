@@ -694,68 +694,100 @@
   }
 
   waitForAck(messageId) {
-    return new Promise((resolve) => {
-      const startTime = Date.now();
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    const call = this.pendingCalls.get(messageId);
+    
+    if (!call) {
+      console.warn('[ToolManager] No pending call found for:', messageId);
+      resolve(false);
+      return;
+    }
+    
+    const timeoutId = setTimeout(() => {
+      console.warn('[ToolManager] Response timeout for:', messageId);
+      hideProcessing();
       
-      const timeoutId = setTimeout(() => {
-        console.warn('[ToolManager] Response timeout for:', messageId);
-        hideProcessing();
+      // ✅ CRITICAL: Check one more time before failing
+      const finalCall = this.pendingCalls.get(messageId);
+      if (finalCall?.ackReceived || finalCall?.resolved) {
+        console.log('[ToolManager] Late success detected in timeout handler');
+        resolve(true);
+      } else {
         resolve(false);
-      }, this.config.responseTimeout);
+      }
+    }, this.config.responseTimeout);
 
-      const checkInterval = setInterval(() => {
-        const call = this.pendingCalls.get(messageId);
-        const timeSinceStart = Date.now() - startTime;
-        
-        if (!call) {
-          clearTimeout(timeoutId);
-          clearInterval(checkInterval);
-          resolve(false);
-          return;
-        }
-        
-        // ✅ Success condition 1: ACK received from Worker
-        if (call.ackReceived) {
-          console.log('[ToolManager] Success: ACK received');
-          clearTimeout(timeoutId);
-          clearInterval(checkInterval);
-          resolve(true);
-          return;
-        }
-        
-        // ✅ Success condition 2: Next tool call arrived
-        if (call.resolved) {
-          console.log('[ToolManager] Success: Next tool call received');
-          clearTimeout(timeoutId);
-          clearInterval(checkInterval);
-          resolve(true);
-          return;
-        }
-        
-        // ✅ Success condition 3: Any server activity after 1s (fallback)
-        const timeSinceLastActivity = Date.now() - this.lastServerActivity;
-        if (timeSinceLastActivity < 500 && timeSinceStart > 1000) {
-          console.log('[ToolManager] Success: Server activity detected');
-          call.ackReceived = true;
-          clearTimeout(timeoutId);
-          clearInterval(checkInterval);
-          resolve(true);
-          return;
-        }
-        
-        // ✅ Success condition 4: pendingToolCallId cleared (fallback)
-        if (!pendingToolCallId && timeSinceStart > 1000) {
-          console.log('[ToolManager] Success: Tool call cleared');
-          call.ackReceived = true;
-          clearTimeout(timeoutId);
-          clearInterval(checkInterval);
-          resolve(true);
-          return;
-        }
-        
-      }, 100);
-    });
-  }
+    const checkInterval = setInterval(() => {
+      const currentCall = this.pendingCalls.get(messageId);
+      const timeSinceStart = Date.now() - startTime;
+      const timeSinceLastActivity = Date.now() - this.lastServerActivity;
+      
+      if (!currentCall) {
+        console.log('[ToolManager] Call removed - assuming success');
+        clearTimeout(timeoutId);
+        clearInterval(checkInterval);
+        resolve(true);
+        return;
+      }
+      
+      // ✅ Success condition 1: ACK received from Worker
+      if (currentCall.ackReceived) {
+        console.log('[ToolManager] ✅ Success: ACK received');
+        clearTimeout(timeoutId);
+        clearInterval(checkInterval);
+        resolve(true);
+        return;
+      }
+      
+      // ✅ Success condition 2: Next tool call arrived (most reliable)
+      if (currentCall.resolved) {
+        console.log('[ToolManager] ✅ Success: Next tool call received');
+        clearTimeout(timeoutId);
+        clearInterval(checkInterval);
+        resolve(true);
+        return;
+      }
+      
+      // ✅ Success condition 3: Server sent SOMETHING recently (after initial delay)
+      if (timeSinceStart > 1500 && timeSinceLastActivity < 1000) {
+        console.log('[ToolManager] ✅ Success: Recent server activity detected', {
+          timeSinceStart,
+          timeSinceLastActivity
+        });
+        currentCall.ackReceived = true;
+        clearTimeout(timeoutId);
+        clearInterval(checkInterval);
+        resolve(true);
+        return;
+      }
+      
+      // ✅ Success condition 4: Tool call was cleared externally
+      if (timeSinceStart > 1500 && !pendingToolCallId) {
+        console.log('[ToolManager] ✅ Success: Tool call ID cleared');
+        currentCall.ackReceived = true;
+        clearTimeout(timeoutId);
+        clearInterval(checkInterval);
+        resolve(true);
+        return;
+      }
+      
+      // ✅ Success condition 5: Screen changed (means new tool call was processed)
+      const activeScreen = document.querySelector('.vapi-screen.is-active');
+      if (timeSinceStart > 1500 && activeScreen && 
+          (activeScreen === screenQuestion || activeScreen === screenCards || 
+           activeScreen === screenPreview || activeScreen === screenCalendly)) {
+        console.log('[ToolManager] ✅ Success: Screen changed - new form loaded');
+        currentCall.ackReceived = true;
+        clearTimeout(timeoutId);
+        clearInterval(checkInterval);
+        resolve(true);
+        return;
+      }
+      
+    }, 150); // Check every 150ms
+  });
+}
 
   onAckReceived(toolCallId) {
     console.log('[ToolManager] ACK received for toolCallId:', toolCallId);
@@ -1448,107 +1480,114 @@
     // HANDLE TOOL CALLS - UPDATED WITH TOOL MANAGER
     // ============================================
 
-    function handleToolCalls(e) {
-      hideProcessing(); // ✅ Hide loader immediately
-      toolManager.onResponseReceived(); // ✅ Mark previous calls complete
-      
-      const t = e?.message ?? e,
-        n = t?.toolCallList ?? t?.toolCalls ?? [];
-      
-      recordToolActivity();
-      
-      n.forEach(i => {
-        const s = i?.id || i?.toolCallId || i?.tool_call_id,
-          a = i?.function?.name || i?.name;
-        console.log("[ToolCall] Received:", a);
-        
-        if (inBRDMode) {
-          console.log("[ToolCall] BLOCKED -", a, "- in BRD mode");
-          return;
-        }
-        
-        let o = i?.function?.arguments ?? i?.arguments ?? {};
-        typeof o == "string" && (o = JSON.parse(o || "{}"));
-        
-        if (a === "ui_show_cards" && o.category) {
-          pendingToolCallId = s;
-          pendingToolName = a;
-          window.__vapiUi.lastCategory = o.category;
-          autoFillParentFields(o.category);
-          const l = CATEGORY_CARDS[o.category] || CATEGORY_CARDS.main_menu;
-          window.__vapiUi.pendingField = l.field;
-          renderCardsFromConfig(l);
-          return;
-        }
-        if (a === "ui_ask_question") {
-          pendingToolCallId = s;
-          pendingToolName = a;
-          const l = o.question_key;
-          if (!l || !QUESTIONS[l]) return;
-          
-          if (l === "collect_email") {
-            console.log("[ToolCall] collect_email question - routing by service");
-            const service = window.__vapiUi.collected?.service;
-            
-            if (service === "Consulting") {
-              console.log("[Email Step] Consulting flow → opening Calendly");
-              showCalendlyForConsulting();
-              return;
-            }
-            
-            (async () => {
-              try {
-                inBRDMode = true;
-                if (backBtn) backBtn.style.display = "none";
-                setUiProcessing(true);
-                console.log("[Email Step] Non-consulting flow → generating BRD");
-                await generateFullBRD();
-              } catch (err) {
-                console.error("[BRD Generation Error]", err);
-              }
-            })();
-            return;
-          }
-          
-          autoFillFromQuestionKey(l);
-          renderQuestionByKey(l);
-          return;
-        }
-        if (a === "ui_show_preview" && (o.preview_type || o.category)) {
-          pendingToolCallId = s;
-          pendingToolName = a;
-          renderPreview(o.preview_type || o.category);
-          return;
-        }
-        if (a === "ui_show_email") {
-          console.log("[ToolCall] ui_show_email (backup handler) - routing by service");
-          const service = window.__vapiUi.collected?.service;
-          
-          if (service === "Consulting") {
-            console.log("[Email Screen] Consulting flow → opening Calendly");
-            showCalendlyForConsulting();
-            return;
-          }
-          
-          (async () => {
-            try {
-              inBRDMode = true;
-              if (backBtn) backBtn.style.display = "none";
-              setUiProcessing(true);
-              console.log("[Email Screen] Non-consulting flow → generating BRD");
-              await generateFullBRD();
-            } catch (err) {
-              console.error("[BRD Generation Error]", err);
-            }
-          })();
-          return;
-        }
-        if (a === "ui_close") {
-          hideOverlay();
-        }
-      });
+   function handleToolCalls(e) {
+  hideProcessing(); // ✅ Hide loader immediately
+  toolManager.onResponseReceived(); // ✅ Mark previous calls complete
+  
+  // ✅ NEW: Update last activity timestamp
+  toolManager.lastServerActivity = Date.now();
+  
+  const t = e?.message ?? e,
+    n = t?.toolCallList ?? t?.toolCalls ?? [];
+  
+  recordToolActivity();
+  
+  n.forEach(i => {
+    const s = i?.id || i?.toolCallId || i?.tool_call_id,
+      a = i?.function?.name || i?.name;
+    console.log("[ToolCall] Received:", a);
+    
+    if (inBRDMode) {
+      console.log("[ToolCall] BLOCKED -", a, "- in BRD mode");
+      return;
     }
-
+    
+    let o = i?.function?.arguments ?? i?.arguments ?? {};
+    typeof o == "string" && (o = JSON.parse(o || "{}"));
+    
+    // ✅ NEW: Clear previous tool call state before processing new one
+    if (pendingToolCallId && pendingToolCallId !== s) {
+      console.log('[ToolCall] Clearing previous tool call:', pendingToolCallId, '→ new:', s);
+    }
+    
+    if (a === "ui_show_cards" && o.category) {
+      pendingToolCallId = s;
+      pendingToolName = a;
+      window.__vapiUi.lastCategory = o.category;
+      autoFillParentFields(o.category);
+      const l = CATEGORY_CARDS[o.category] || CATEGORY_CARDS.main_menu;
+      window.__vapiUi.pendingField = l.field;
+      renderCardsFromConfig(l);
+      return;
+    }
+    if (a === "ui_ask_question") {
+      pendingToolCallId = s;
+      pendingToolName = a;
+      const l = o.question_key;
+      if (!l || !QUESTIONS[l]) return;
+      
+      if (l === "collect_email") {
+        console.log("[ToolCall] collect_email question - routing by service");
+        const service = window.__vapiUi.collected?.service;
+        
+        if (service === "Consulting") {
+          console.log("[Email Step] Consulting flow → opening Calendly");
+          showCalendlyForConsulting();
+          return;
+        }
+        
+        (async () => {
+          try {
+            inBRDMode = true;
+            if (backBtn) backBtn.style.display = "none";
+            setUiProcessing(true);
+            console.log("[Email Step] Non-consulting flow → generating BRD");
+            await generateFullBRD();
+          } catch (err) {
+            console.error("[BRD Generation Error]", err);
+          }
+        })();
+        return;
+      }
+      
+      autoFillFromQuestionKey(l);
+      renderQuestionByKey(l);
+      return;
+    }
+    if (a === "ui_show_preview" && (o.preview_type || o.category)) {
+      pendingToolCallId = s;
+      pendingToolName = a;
+      renderPreview(o.preview_type || o.category);
+      return;
+    }
+    if (a === "ui_show_email") {
+      console.log("[ToolCall] ui_show_email (backup handler) - routing by service");
+      const service = window.__vapiUi.collected?.service;
+      
+      if (service === "Consulting") {
+        console.log("[Email Screen] Consulting flow → opening Calendly");
+        showCalendlyForConsulting();
+        return;
+      }
+      
+      (async () => {
+        try {
+          inBRDMode = true;
+          if (backBtn) backBtn.style.display = "none";
+          setUiProcessing(true);
+          console.log("[Email Screen] Non-consulting flow → generating BRD");
+          await generateFullBRD();
+        } catch (err) {
+          console.error("[BRD Generation Error]", err);
+        }
+      })();
+      return;
+    }
+    if (a === "ui_close") {
+      hideOverlay();
+    }
+  });
+}
     // ============================================
     // VOICE TO UI - BLOCKS IN BRD MODE
     // ============================================

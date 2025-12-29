@@ -329,7 +329,34 @@
       throw error;
     }
   }
-  
+
+
+  async function initCameraSafely(initFn) {
+  try {
+    return await initFn();
+  } catch (error) {
+    logError(error, { context: 'camera_init' });
+
+    let message = 'Camera setup failed. Please check your device settings.';
+
+    // Specific Camera Error Handling
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      message = 'Camera access denied. Please grant permission in your browser settings and try again.';
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      message = 'No camera found. Please connect a webcam.';
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      // This happens if the hardware is already in use (e.g., by Zoom or another tab)
+      message = 'Camera is already in use by another application or tab.';
+    } else if (error.name === 'OverconstrainedError') {
+      message = 'The requested camera resolution is not supported by your device.';
+    } else if (error.name === 'AbortError') {
+      message = 'Camera initialization was aborted due to a hardware issue.';
+    }
+
+    showNotification(message, 'error');
+    throw error;
+  }
+}
   // Wait for DOM to be ready
   function init() {
     

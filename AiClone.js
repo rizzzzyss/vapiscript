@@ -900,7 +900,7 @@ function initBRDScrollHint() {
       document.body.classList.remove("vapi-overlay-open");
     }
 
-    function attemptCloseOverlay() {
+    /*function attemptCloseOverlay() {
   // BRD mode has special handling
   if (inBRDMode) {
     const ok = confirm("Close BRD and lose changes?");
@@ -916,6 +916,37 @@ function initBRDScrollHint() {
   }
   
   isActive ? (stopCall(true), setState("idle")) : hideOverlay();
+}*/
+
+    function attemptCloseOverlay() {
+  // BRD mode has special handling
+  if (inBRDMode) {
+    const ok = confirm("Close BRD and lose changes?");
+    if (!ok) return;
+    inBRDMode = false;
+    if (closeBtn) closeBtn.style.display = '';
+    if (backBtn) backBtn.style.display = '';
+  } else if (isActive) {
+    // Voice call is active - warn user
+    if (!confirm("This will end your voice call and you'll lose your progress. Close anyway?")) {
+      return;
+    }
+  } else {
+    // No active call, just data entry
+    if (!confirm("If you close now, you will lose the data and you must start from the beginning. Close anyway?")) {
+      return;
+    }
+  }
+  
+  // Stop voice call if active
+  if (isActive) {
+    console.log('[Close] Ending voice call');
+    stopCall(true); // Send end signal to server
+    setState("idle");
+  }
+  
+  // Hide overlay
+  hideOverlay();
 }
 
     function showScreen(e) {

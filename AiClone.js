@@ -1081,7 +1081,10 @@ backBtn?.addEventListener("click", () => {
       const t = window.__vapiUi.pendingField;
       setCollected(t, e);
       const n = e.join(", ");
+        showProcessing('Processing selections...'); // ← ADD THIS LINE
+
       setUiProcessing(true);
+      
       sendToolResult({ field: t, values: e, userSelected: n });
       setTimeout(() => { pendingToolCallId || sendAsUserMessage(`I selected: ${n}`); }, 300);
     });

@@ -1608,295 +1608,317 @@ backBtn?.addEventListener("click", () => {
   }
 }
 
-    async function startCall() {
-      setState("loading");
-      showStatusIndicator();
-      updateStatusIndicator("connecting");
-      nextPlayTime = 0;
-      window.vapiAudioLevel = 0;
-      window.vapiIsSpeaking = false;
-      playCtx = playCtx || new(window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
-      
-      try { 
-        await playCtx.resume(); 
-      } catch (err) {
-        logError(err, { context: 'audio_context_resume' });
+async function startCall() {
+  console.log('[START CALL] Requested. isActive:', isActive, 'socket state:', socket?.readyState);
+  
+  // ✅ GUARD 1: Prevent multiple simultaneous calls
+  if (isActive) {
+    console.warn('[START CALL] Call already active, ignoring');
+    return;
+  }
+  
+  // ✅ GUARD 2: Ensure previous socket is fully closed
+  if (socket && socket.readyState !== WebSocket.CLOSED) {
+    console.warn('[START CALL] Previous socket not closed (state:', socket.readyState, '), waiting...');
+    showNotification('Please wait a moment before starting a new call', 'info', 2000);
+    return;
+  }
+  
+  // ✅ FIX: Reset tool call state before starting
+  console.log('[START CALL] Resetting tool state');
+  resetToolCallState();
+  
+  console.log('[START CALL] Starting new call...');
+  setState("loading");
+  showStatusIndicator();
+  updateStatusIndicator("connecting");
+  nextPlayTime = 0;
+  window.vapiAudioLevel = 0;
+  window.vapiIsSpeaking = false;
+  playCtx = playCtx || new(window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" });
+  
+  try { 
+    await playCtx.resume(); 
+  } catch (err) {
+    logError(err, { context: 'audio_context_resume' });
+  }
+  
+  try {
+    console.log('[START CALL] Creating WebSocket URL...');
+    const wsUrl = await createWebsocketCallUrl();
+    console.log('[START CALL] Got URL, creating WebSocket...');
+    
+    socket = new WebSocket(wsUrl);
+    socket.binaryType = "arraybuffer";
+    
+    const connectionTimeout = setTimeout(() => {
+      console.error('[START CALL] Connection timeout! State:', socket?.readyState);
+      if (socket?.readyState !== WebSocket.OPEN) {
+        stopCall(false);
+        setState("idle");
+        hideStatusIndicator();
+        showNotification("Connection timeout. Please try again.", 'error');
       }
-      
+    }, AUDIO_CONFIG.connectionTimeoutMs);
+    
+    socket.onopen = async () => {
       try {
-        const wsUrl = await createWebsocketCallUrl();
-        socket = new WebSocket(wsUrl);
-        socket.binaryType = "arraybuffer";
+        clearTimeout(connectionTimeout);
+        console.log('[WebSocket] Connection opened successfully!');
         
-        const connectionTimeout = setTimeout(() => {
-          if (socket?.readyState !== WebSocket.OPEN) {
-            stopCall(false);
-            setState("idle");
-            hideStatusIndicator();
-            showNotification("Connection timeout. Please try again.", 'error');
-          }
-        }, AUDIO_CONFIG.connectionTimeoutMs);
-        
- /*       socket.onopen = async () => {
-          try {
-            clearTimeout(connectionTimeout);
-            
-            stream = await initAudioSafely(async () => {
-              return await navigator.mediaDevices.getUserMedia({
-                audio: {
-                  channelCount: 1,
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true
-                }
-              });
-            });
-            
-            try { 
-              window.stopHandMode?.(); 
-            } catch (err) { 
-              console.warn('[HAND] stopHandMode failed', err); 
+        console.log('[WebSocket] Requesting microphone...');
+        stream = await initAudioSafely(async () => {
+          return await navigator.mediaDevices.getUserMedia({
+            audio: {
+              channelCount: 1,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
             }
-
-            audioContext = new(window.AudioContext || window.webkitAudioContext);
-            await audioContext.resume();
-            const workletBlob = createWorkletProcessorBlob();
-            await audioContext.audioWorklet.addModule(workletBlob);
-            URL.revokeObjectURL(workletBlob);
-            source = audioContext.createMediaStreamSource(stream);
-            const gainNode = audioContext.createGain();
-            gainNode.gain.value = 4.0;
-            workletNode = new AudioWorkletNode(audioContext, "vapi-audio-processor");
-            workletNode.port.onmessage = msg => { 
-              socket?.readyState === WebSocket.OPEN && socket.send(msg.data); 
-              processAudioForVAD(msg.data); 
-            };
-            source.connect(gainNode);
-            gainNode.connect(workletNode);
-            startVADCheck();
-            isActive = true;
-            setState("active");
-            updateStatusIndicator("listening");
-            updateAudioLevel();
-            startActivityMonitoring(); // Start activity-based auto-disconnect monitoring
-            
-            showNotification("Connected successfully", 'success', 2000);
-            
-          } catch (error) {
-            logError(error, { context: 'websocket_onopen' });
-            stopCall(false);
-            setState("idle");
-            hideStatusIndicator();
-          }
-        };*/
-
-        window.initCameraSafely = initCameraSafely;
-
-console.log('[Vapi] initCameraSafely exposed globally for hand tracking');
-        async function initAudioSafely(initFn) {
-  try {
-    return await initFn();
-  } catch (error) {
-    logError(error, { context: 'audio_init' });
-    
-    let message = 'Microphone setup failed. Please check your device settings.';
-    
-    // Specific Audio Error Handling
-    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-      message = 'Microphone access denied. Please grant permission in your browser settings and try again.';
-    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-      message = 'No microphone found. Please connect a microphone.';
-    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-      message = 'Microphone is already in use by another application or tab.';
-    } else if (error.name === 'OverconstrainedError') {
-      message = 'The requested microphone settings are not supported by your device.';
-    } else if (error.name === 'AbortError') {
-      message = 'Microphone initialization was aborted due to a hardware issue.';
-    }
-    
-    showNotification(message, 'error');
-    throw error;
-  }
-}
-
-socket.onopen = async () => {
-  try {
-    clearTimeout(connectionTimeout);
-    
-    // Only initialize Audio (no camera here)
-    stream = await initAudioSafely(async () => {
-      return await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
+          });
+        });
+        
+        console.log('[WebSocket] Microphone granted, setting up audio...');
+        
+        try { 
+          window.stopHandMode?.(); 
+        } catch (err) { 
+          console.warn('[HAND] stopHandMode failed', err); 
         }
-      });
-    });
-    
-    // Remove the camera initialization block entirely
-    // (No initCameraSafely call here)
-    
-    try { 
-      window.stopHandMode?.(); 
-    } catch (err) { 
-      console.warn('[HAND] stopHandMode failed', err); 
-    }
-    
-    audioContext = new(window.AudioContext || window.webkitAudioContext);
-    await audioContext.resume();
-    
-    const workletBlob = createWorkletProcessorBlob();
-    await audioContext.audioWorklet.addModule(workletBlob);
-    URL.revokeObjectURL(workletBlob);
-    
-    source = audioContext.createMediaStreamSource(stream);
-    const gainNode = audioContext.createGain();
-    gainNode.gain.value = 4.0;
-    
-    workletNode = new AudioWorkletNode(audioContext, "vapi-audio-processor");
-    workletNode.port.onmessage = msg => { 
-      socket?.readyState === WebSocket.OPEN && socket.send(msg.data); 
-      processAudioForVAD(msg.data); 
-    };
-    
-    source.connect(gainNode);
-    gainNode.connect(workletNode);
-    
-    startVADCheck();
-    isActive = true;
-    setState("active");
-    updateStatusIndicator("listening");
-    updateAudioLevel();
-    startActivityMonitoring();
-    
-    showNotification("Connected successfully", 'success', 2000);
-    
-  } catch (error) {
-    logError(error, { context: 'websocket_onopen' });
-    stopCall(false);
-    setState("idle");
-    hideStatusIndicator();
-  }
-};
         
-        socket.onmessage = async msg => {
-          try {
-            if (msg.data instanceof ArrayBuffer) { 
-              const pcm = new Int16Array(msg.data); 
-              pcm.length > 0 && playPcm16(pcm, AUDIO_CONFIG.outputSampleRate); 
-              return; 
-            }
-            
-            const processMessage = message => {
-              let parsed;
-              try { parsed = JSON.parse(message); } catch { return; }
-              const content = parsed?.message ?? parsed;
-              if (content?.type === "tool-calls") { 
-                handleToolCalls(parsed); 
-                return; 
-              }
-              const transcript = extractTranscriptMessage(content);
-              transcript && applyVoiceToUI(transcript);
-            };
-            
-            if (typeof msg.data == "string") return processMessage(msg.data);
-            if (msg.data instanceof Blob) {
-              try { 
-                processMessage(await msg.data.text()); 
-              } catch (err) {
-                logError(err, { context: 'blob_text' });
-              }
-            }
-          } catch (error) {
-            logError(error, { context: 'websocket_onmessage' });
-          }
+        audioContext = new(window.AudioContext || window.webkitAudioContext);
+        await audioContext.resume();
+        
+        const workletBlob = createWorkletProcessorBlob();
+        await audioContext.audioWorklet.addModule(workletBlob);
+        URL.revokeObjectURL(workletBlob);
+        
+        source = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 4.0;
+        
+        workletNode = new AudioWorkletNode(audioContext, "vapi-audio-processor");
+        workletNode.port.onmessage = msg => { 
+          socket?.readyState === WebSocket.OPEN && socket.send(msg.data); 
+          processAudioForVAD(msg.data); 
         };
         
-socket.onerror = (error) => { 
-  logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
-  
-  // Only show notification if call was active (not during initial connection)
-  if (isActive) {
-    showNotification(
-      "Connection issue detected. Attempting to reconnect...", 
-      "warning", 
-      5000
-    );
-  }
-};
+        source.connect(gainNode);
+        gainNode.connect(workletNode);
         
- socket.onclose = (event) => {
-  const wasActive = isActive;
-  stopCall(false);
-  
-  // Only show notification for unexpected disconnections during active calls
-  // Code 1000 = normal closure, 1001 = going away, 1005 = no status received
-  const isAbnormalClosure = event.code !== 1000 && event.code !== 1001 && event.code !== 1005;
-  
-  if (wasActive && isAbnormalClosure) {
-    console.error('[WebSocket] Abnormal closure:', event.code, event.reason);
-    showNotification(
-      "Connection lost. Please tap the phone icon to restart.", 
-      "error", 
-      8000
-    );
-  }
-};
+        startVADCheck();
+        isActive = true;
+        setState("active");
+        updateStatusIndicator("listening");
+        updateAudioLevel();
+        startActivityMonitoring();
+        
+        console.log('[WebSocket] Setup complete!');
+        showNotification("Connected successfully", 'success', 2000);
         
       } catch (error) {
-        logError(error, { context: 'start_call' });
+        console.error('[WebSocket] Setup error:', error);
+        logError(error, { context: 'websocket_onopen' });
         stopCall(false);
         setState("idle");
         hideStatusIndicator();
       }
-    }
-
-function stopCall(sendEndSignal = true) {
-      // 1. Reset speaking states
-      window.vapiAudioLevel = 0;
-      window.vapiIsSpeaking = false;
-      isActive = false;
-      
-      // 2. Stop the background "listening" monitors
-      stopVADCheck();
-      clearActivityMonitoring();
-      
-      // 3. Inform the server the call is over (if connection is still alive)
-      try { 
-        if (sendEndSignal && socket?.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ type: "end-call" })); 
+    };
+    
+    socket.onmessage = async msg => {
+      try {
+        if (msg.data instanceof ArrayBuffer) { 
+          const pcm = new Int16Array(msg.data); 
+          pcm.length > 0 && playPcm16(pcm, AUDIO_CONFIG.outputSampleRate); 
+          return; 
         }
-      } catch (err) {
-        logError(err, { context: 'stop_call_send' });
+        
+        const processMessage = message => {
+          let parsed;
+          try { parsed = JSON.parse(message); } catch { return; }
+          const content = parsed?.message ?? parsed;
+          if (content?.type === "tool-calls") { 
+            handleToolCalls(parsed); 
+            return; 
+          }
+          const transcript = extractTranscriptMessage(content);
+          transcript && applyVoiceToUI(transcript);
+        };
+        
+        if (typeof msg.data == "string") return processMessage(msg.data);
+        if (msg.data instanceof Blob) {
+          try { 
+            processMessage(await msg.data.text()); 
+          } catch (err) {
+            logError(err, { context: 'blob_text' });
+          }
+        }
+      } catch (error) {
+        logError(error, { context: 'websocket_onmessage' });
+      }
+    };
+    
+    socket.onerror = (error) => { 
+      console.error('[WebSocket] ERROR:', error, 'State:', socket?.readyState);
+      logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
+      
+      if (isActive) {
+        showNotification(
+          "Connection issue detected. Attempting to reconnect...", 
+          "warning", 
+          5000
+        );
+      }
+    };
+    
+    socket.onclose = (event) => {
+      console.log('[WebSocket] Closed. Code:', event.code, 'Reason:', event.reason || 'none', 'Clean:', event.wasClean);
+      
+      const wasActive = isActive;
+      
+      if (isActive) {
+        stopCall(false);
       }
       
-      // 4. Release hardware (Turn off Microphone and Audio engine)
-      try { workletNode?.disconnect(); } catch {}
-      try { source?.disconnect(); } catch {}
-      try { audioContext?.close(); } catch {}
-      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-      try { socket?.close(); } catch {}
+      const isNormalClosure = 
+        event.code === 1000 || 
+        event.code === 1001 || 
+        event.code === 1005 || 
+        !wasActive;
       
-      // 5. Clear memory references
-      socket = stream = audioContext = workletNode = source = null;
-      nextPlayTime = 0;
-      pendingToolCallId = null;
-      pendingToolName = null;
+      if (!isNormalClosure) {
+        console.error('[WebSocket] Abnormal closure:', event.code, event.reason);
+        showNotification(
+          "Connection lost. Please try again.", 
+          "error", 
+          5000
+        );
+      } else {
+        console.log('[WebSocket] Normal closure');
+      }
+    };
+    
+  } catch (error) {
+    console.error('[START CALL] Error:', error);
+    logError(error, { context: 'start_call' });
+    stopCall(false);
+    setState("idle");
+    hideStatusIndicator();
+  }
+}
 
-      // 6. Reset UI visuals
-      if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
-      else if (pill) pill.style.transform = "scale(1)";
-      
-      // 7. Hide the form (unless the user is reading their generated document)
-      if (!inBRDMode) hideOverlay();
-      
-      hideStatusIndicator();
-      setState("idle");
-      
-      console.log('[Vapi] Call stopped and resources released.');
+function stopCall(sendEndSignal = true) {
+  console.log('[STOP CALL] Starting cleanup. sendEndSignal:', sendEndSignal, 'isActive:', isActive);
+  
+  window.vapiAudioLevel = 0;
+  window.vapiIsSpeaking = false;
+  isActive = false;
+  
+  stopVADCheck();
+  clearActivityMonitoring();
+  
+  try { 
+    if (sendEndSignal && socket?.readyState === WebSocket.OPEN) {
+      console.log('[STOP CALL] Sending end-call message');
+      socket.send(JSON.stringify({ type: "end-call" })); 
     }
+  } catch (err) {
+    console.warn('[STOP CALL] Could not send end signal:', err);
+  }
+  
+  try { 
+    if (workletNode) {
+      workletNode.port.onmessage = null;
+      workletNode.disconnect();
+      console.log('[STOP CALL] Worklet disconnected');
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Worklet disconnect error:', e);
+  }
+  
+  try { 
+    if (source) {
+      source.disconnect();
+      console.log('[STOP CALL] Source disconnected');
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Source disconnect error:', e);
+  }
+  
+  try { 
+    if (audioContext && audioContext.state !== 'closed') {
+      audioContext.close();
+      console.log('[STOP CALL] Audio context closed');
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Audio context close error:', e);
+  }
+  
+  try { 
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log('[STOP CALL] Track stopped:', track.kind);
+      });
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Track stop error:', e);
+  }
+  
+  try { 
+    if (socket) {
+      const socketState = socket.readyState;
+      console.log('[STOP CALL] Closing socket, readyState:', socketState);
+      
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      
+      if (socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING) {
+        socket.close(1000, 'Client closed');
+      }
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Socket close error:', e);
+  }
+  
+  socket = null;
+  stream = null;
+  audioContext = null;
+  workletNode = null;
+  source = null;
+  nextPlayTime = 0;
+  
+  pendingToolCallId = null;
+  pendingToolName = null;
+  
+  analyser = null;
+  analyserData = null;
+
+  if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
+  else if (pill) pill.style.transform = "scale(1)";
+  
+  if (!inBRDMode) {
+    hideOverlay();
+  } else {
+    showNotification('Voice call ended. You can continue working on your document.', 'info', 3000);
+  }
+  
+  hideStatusIndicator();
+  setState("idle");
+  
+  setUiProcessing(false);
+  
+  console.log('[STOP CALL] Cleanup complete');
+}
+
+function resetToolCallState() {
+  console.log('[Reset Tool State] Clearing pending tool calls');
+  pendingToolCallId = null;
+  pendingToolName = null;
+  setUiProcessing(false);
+}
 
     function setUiProcessing(e) {
       submitTextBtn && (submitTextBtn.disabled = e);

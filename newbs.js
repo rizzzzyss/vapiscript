@@ -2590,40 +2590,70 @@ async function generateFullBRD() {
     window.open(generatedBRD.downloadUrl, '_blank');
   }
 
-  function startNewProject() {
-    inBRDMode = false;
-    console.log("[BRD Mode] UNLOCKED");
-    
-    if (closeBtn) closeBtn.style.display = '';
-    if (backBtn) backBtn.style.display = '';
-    
-    window.__vapiUi.collected = {};
-    window.__vapiUi.selected.clear();
-    window.__vapiUi.flow = null;
-    window.__vapiUi.step = null;
-    window.__vapiUi.pendingField = null;
-    window.__vapiUi.lastCategory = null;
-    
-    generatedBRD = { 
-      originalHtml: "", 
-      html: "", 
-      designImageBase64: null, 
-      designImageUrl: null, 
-      designSource: null, 
-      userUploadedImageBase64: null, 
-      userUploadedImageName: null, 
-      pdfBase64: null, 
-      pdfBlob: null, 
-      pdfFilename: null,
-      downloadUrl: null
-    };
-    
-    if (brdEmailInput) brdEmailInput.value = "";
-    if (brdUploadInput) brdUploadInput.value = "";
-    if (emailInput) emailInput.value = "";
-    
-    hideOverlay();
+ function startNewProject() {
+  console.log('[Start New Project] Initiating...');
+  
+  // ✅ End the call if active
+  if (isActive) {
+    console.log('[Start New Project] Ending active voice call');
+    stopCall(true);
+    setState("idle");
   }
+  
+  // Unlock BRD mode
+  inBRDMode = false;
+  console.log("[BRD Mode] UNLOCKED");
+  
+  // Show buttons again
+  if (closeBtn) closeBtn.style.display = '';
+  if (backBtn) backBtn.style.display = '';
+  
+  // Reset all collected data
+  window.__vapiUi.collected = {};
+  window.__vapiUi.selected.clear();
+  window.__vapiUi.flow = null;
+  window.__vapiUi.step = null;
+  window.__vapiUi.pendingField = null;
+  window.__vapiUi.lastCategory = null;
+  
+  // Reset BRD data
+  generatedBRD = { 
+    originalHtml: "", 
+    html: "", 
+    designImageBase64: null, 
+    designImageUrl: null, 
+    designSource: null, 
+    userUploadedImageBase64: null, 
+    userUploadedImageName: null, 
+    pdfBase64: null, 
+    pdfBlob: null, 
+    pdfFilename: null,
+    downloadUrl: null
+  };
+  
+  // Clear form inputs
+  if (brdEmailInput) brdEmailInput.value = "";
+  if (brdUploadInput) brdUploadInput.value = "";
+  if (emailInput) emailInput.value = "";
+  if (brdContent) brdContent.innerHTML = "";
+  if (brdUploadPreview) {
+    brdUploadPreview.innerHTML = "";
+    brdUploadPreview.classList.remove('has-file');
+  }
+  
+  // Hide all screens
+  [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess, screenCalendly].forEach(s => {
+    if (s) s.classList.remove('is-active');
+  });
+  
+  // Close overlay
+  hideOverlay();
+  
+  // Show success notification
+  showNotification('Ready to start a new project!', 'success', 3000);
+  
+  console.log('[Start New Project] Complete - ready for new session');
+}
 
   // ============================================
   // EVENT LISTENERS

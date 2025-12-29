@@ -1893,7 +1893,7 @@
 function stopCall(sendEndSignal = true) {
   console.log('[STOP CALL] Starting cleanup. sendEndSignal:', sendEndSignal, 'isActive:', isActive);
   
-  // ✅ NEW: Check if in BRD mode and ask for confirmation
+  // ✅ Check if in BRD mode and ask for confirmation
   if (inBRDMode && isActive) {
     const confirmClose = confirm(
       "You're currently working on your BRD document. If you end the call now, your progress will be saved but the form will close.\n\nEnd call and close form?"
@@ -1904,7 +1904,7 @@ function stopCall(sendEndSignal = true) {
       return; // Don't stop the call
     }
     
-    // ✅ User confirmed - close everything
+    // ✅ User confirmed - close everything and reset
     console.log('[STOP CALL] User confirmed - closing BRD mode and form');
     
     // Unlock BRD mode
@@ -1942,6 +1942,16 @@ function stopCall(sendEndSignal = true) {
     if (brdEmailInput) brdEmailInput.value = "";
     if (brdUploadInput) brdUploadInput.value = "";
     if (emailInput) emailInput.value = "";
+    if (brdContent) brdContent.innerHTML = "";
+    if (brdUploadPreview) {
+      brdUploadPreview.innerHTML = "";
+      brdUploadPreview.classList.remove('has-file');
+    }
+    
+    // ✅ Hide all screens before closing overlay
+    [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess, screenCalendly].forEach(s => {
+      if (s) s.classList.remove('is-active');
+    });
     
     // Show notification
     showNotification('Call ended. Your progress has been cleared.', 'info', 4000);
@@ -2039,12 +2049,13 @@ function stopCall(sendEndSignal = true) {
   if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
   else if (pill) pill.style.transform = "scale(1)";
   
-  // ✅ UPDATED: Always close overlay after cleanup
-  hideOverlay();
+  // ✅ ALWAYS close overlay and hide status after cleanup
+  overlay.classList.remove('is-open');
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('vapi-overlay-open');
   
   hideStatusIndicator();
   setState("idle");
-  
   setUiProcessing(false);
   
   console.log('[STOP CALL] Cleanup complete');

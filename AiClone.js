@@ -846,23 +846,22 @@ function initBRDScrollHint() {
       document.body.classList.add("vapi-overlay-open");
     }
 
- function hideOverlay() {
-      if (inBRDMode) return;
-      
-      overlay.classList.remove("is-open");
-      overlay.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("vapi-overlay-open");
-      
-      // Deactivate ALL screens so the next call starts from the beginning
-      [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess, screenCalendly].forEach(s => {
-        if (s) {
-          s.classList.remove("is-active");
-          s.style.opacity = "1"; // Reset opacity for next use
-        }
-      });
-      
-      window.__vapiUi.selected.clear();
+function hideOverlay() {
+  if (inBRDMode) return; // Prevent closing if in the PDF/BRD viewer
+  
+  overlay.classList.remove("is-open");
+  overlay.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("vapi-overlay-open");
+  
+  // Explicitly hide all screen elements
+  const screens = [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess, screenCalendly];
+  screens.forEach(s => {
+    if (s) {
+      s.classList.remove("is-active");
+      s.style.opacity = "0"; // Extra safety to ensure it vanishes
     }
+  });
+}
     function attemptCloseOverlay() {
   // BRD mode has special handling
   if (inBRDMode) {
@@ -1625,70 +1624,58 @@ backBtn?.addEventListener("click", () => {
           setState("idle"); 
         };
         
-   socket.onclose = (event) => { 
-          // true means: Close the UI form immediately
-          stopCall(true); 
-          
-          // If it wasn't a manual hangup, inform the user
-          if (!event.wasClean) {
-            showNotification("Connection lost. Please tap the button to call again.", "error", 8000);
-          }
-        };
+socket.onclose = (event) => { 
+  console.log('[Vapi] Socket Closed:', event);
+  stopCall(true); // TRUE forces the UI to vanish
+  if (!event.wasClean) {
+    showNotification("Connection lost. Please call again.", "error", 5000);
+  }
+};
         
-        socket.onerror = (error) => { 
-          logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
-          stopCall(true); 
-          showNotification("Connection error. Please try calling again.", "error", 8000);
-        };
-        
-      } catch (error) {
-        logError(error, { context: 'start_call' });
-        stopCall(false);
-        setState("idle");
-        hideStatusIndicator();
-      }
-    }
+      socket.onerror = (error) => { 
+  console.error('[Vapi] Socket Error:', error);
+  stopCall(true); // TRUE forces the UI to vanish
+  showNotification("Connection error. Please try again.", "error", 5000);
+};
 
 function stopCall(shouldHideUI = true) {
-      window.vapiAudioLevel = 0;
-      window.vapiIsSpeaking = false;
-      isActive = false;
-      stopVADCheck();
-      clearActivityMonitoring();
-      
-      try { 
-        if (socket?.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ type: "end-call" })); 
-        }
-      } catch (err) {
-        logError(err, { context: 'stop_call_send' });
-      }
-      
-      try { workletNode?.disconnect(); } catch {}
-      try { source?.disconnect(); } catch {}
-      try { audioContext?.close(); } catch {}
-      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-      try { socket?.close(); } catch {}
-      
-      socket = stream = audioContext = workletNode = source = null;
-      nextPlayTime = 0;
-      pendingToolCallId = null;
-      pendingToolName = null;
-      
-      if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
-      
-      // If true, we kill the UI and wipe the collected data
-      if (shouldHideUI) {
-        hideOverlay();
-        window.__vapiUi.collected = {}; // WIPE DATA
-        window.__vapiUi.selected.clear();
-        window.__vapiUi.lastCategory = null;
-      }
-      
-      hideStatusIndicator();
-      setState("idle");
+  isActive = false;
+  window.vapiAudioLevel = 0;
+  window.vapiIsSpeaking = false;
+  
+  // 1. Cleanup WebSocket
+  try { 
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "end-call" })); 
     }
+    socket?.close();
+  } catch (err) {}
+  
+  // 2. Cleanup Audio
+  try { workletNode?.disconnect(); } catch {}
+  try { source?.disconnect(); } catch {}
+  try { audioContext?.close(); } catch {}
+  try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+  
+  socket = stream = audioContext = workletNode = source = null;
+  pendingToolCallId = null;
 
+  // 3. The UI Reset
+  if (shouldHideUI) {
+    hideOverlay(); // This removes the "is-open" class
+    
+    // RESET DATA
+    window.__vapiUi.collected = {};
+    window.__vapiUi.selected.clear();
+    window.__vapiUi.lastCategory = null;
+    
+    // Ensure the pill/button returns to green
+    setState("idle");
+  }
+
+  hideStatusIndicator();
+  if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
+}
     function setUiProcessing(e) {
       submitTextBtn && (submitTextBtn.disabled = e);
       confirmMultiBtn && (confirmMultiBtn.disabled = e || window.__vapiUi.selected.size === 0);

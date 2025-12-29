@@ -572,6 +572,14 @@ btn?.addEventListener("click", () => {
 
 document.getElementById('vapiSuccessCloseBtn')?.addEventListener('click', () => {
   inBRDMode = false;
+
+    if (isActive) 
+    {
+    console.log('[Success Close] Ending voice call');
+    stopCall(true);
+    setState("idle");
+    }
+  
   
   window.__vapiUi.collected = {};
   window.__vapiUi.selected.clear();

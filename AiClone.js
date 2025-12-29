@@ -846,22 +846,17 @@ function initBRDScrollHint() {
       document.body.classList.add("vapi-overlay-open");
     }
 
-function hideOverlay() {
-  if (inBRDMode) return; // Prevent closing if in the PDF/BRD viewer
-  
-  overlay.classList.remove("is-open");
-  overlay.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("vapi-overlay-open");
-  
-  // Explicitly hide all screen elements
-  const screens = [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess, screenCalendly];
-  screens.forEach(s => {
-    if (s) {
-      s.classList.remove("is-active");
-      s.style.opacity = "0"; // Extra safety to ensure it vanishes
+    function hideOverlay() {
+      if (inBRDMode) {
+        console.log("[hideOverlay] BLOCKED - in BRD mode");
+        return;
+      }
+      overlay.classList.remove("is-open");
+      overlay.setAttribute("aria-hidden", "true");
+      window.__vapiUi.selected.clear();
+      document.body.classList.remove("vapi-overlay-open");
     }
-  });
-}
+
     function attemptCloseOverlay() {
   // BRD mode has special handling
   if (inBRDMode) {
@@ -1618,59 +1613,53 @@ backBtn?.addEventListener("click", () => {
           }
         };
         
-      
+        socket.onerror = (error) => { 
+          logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
+          stopCall(false); 
+          setState("idle"); 
+        };
         
-socket.onclose = (event) => { 
-  console.log('[Vapi] Socket Closed:', event);
-  stopCall(true); // TRUE forces the UI to vanish
-  if (!event.wasClean) {
-    showNotification("Connection lost. Please call again.", "error", 5000);
-  }
-};
+        socket.onclose = () => { 
+          stopCall(false); 
+          setState("idle"); 
+        };
         
-   socket.onerror = (error) => { 
-  console.error('[Vapi] Socket Error:', error);
-  stopCall(true); // TRUE forces the UI to vanish
-  showNotification("Connection error. Please try again.", "error", 5000);
-};
-function stopCall(shouldHideUI = true) {
-  isActive = false;
-  window.vapiAudioLevel = 0;
-  window.vapiIsSpeaking = false;
-  
-  // 1. Cleanup WebSocket
-  try { 
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "end-call" })); 
+      } catch (error) {
+        logError(error, { context: 'start_call' });
+        stopCall(false);
+        setState("idle");
+        hideStatusIndicator();
+      }
     }
-    socket?.close();
-  } catch (err) {}
-  
-  // 2. Cleanup Audio
-  try { workletNode?.disconnect(); } catch {}
-  try { source?.disconnect(); } catch {}
-  try { audioContext?.close(); } catch {}
-  try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-  
-  socket = stream = audioContext = workletNode = source = null;
-  pendingToolCallId = null;
 
-  // 3. The UI Reset
-  if (shouldHideUI) {
-    hideOverlay(); // This removes the "is-open" class
-    
-    // RESET DATA
-    window.__vapiUi.collected = {};
-    window.__vapiUi.selected.clear();
-    window.__vapiUi.lastCategory = null;
-    
-    // Ensure the pill/button returns to green
-    setState("idle");
-  }
+    function stopCall(e = true) {
+      window.vapiAudioLevel = 0;
+      window.vapiIsSpeaking = false;
+      isActive = false;
+      stopVADCheck();
+      clearActivityMonitoring(); // Clear activity monitoring
+      
+      try { 
+        e && socket?.readyState === WebSocket.OPEN && socket.send(JSON.stringify({ type: "end-call" })); 
+      } catch (err) {
+        logError(err, { context: 'stop_call_send' });
+      }
+      
+      try { workletNode?.disconnect(); } catch {}
+      try { source?.disconnect(); } catch {}
+      try { audioContext?.close(); } catch {}
+      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+      try { socket?.close(); } catch {}
+      
+      socket = stream = audioContext = workletNode = source = null;
+      nextPlayTime = 0;
+      pendingToolCallId = null;
+      pendingToolName = null;
+      pillWrap ? pillWrap.style.transform = "translateX(-50%) scale(1)" : pill.style.transform = "scale(1)";
+      if (!inBRDMode) hideOverlay();
+      hideStatusIndicator();
+    }
 
-  hideStatusIndicator();
-  if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
-}
     function setUiProcessing(e) {
       submitTextBtn && (submitTextBtn.disabled = e);
       confirmMultiBtn && (confirmMultiBtn.disabled = e || window.__vapiUi.selected.size === 0);

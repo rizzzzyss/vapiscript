@@ -2070,32 +2070,34 @@ window.addEventListener('message', function(e) {
   }
 });
     function renderBRDViewer() {
-      const collected = window.__vapiUi.collected;
-      if (brdContent) brdContent.innerHTML = generatedBRD.html;
-      
-      if (brdDesignSection) {
-        if (generatedBRD.designImageUrl) {
-          brdDesignSection.classList.add('is-visible');
-          if (brdDesignImage) brdDesignImage.src = generatedBRD.designImageUrl;
-          if (brdDesignCaption) brdDesignCaption.textContent = generatedBRD.designSource === "gemini" ? "AI-Generated Design Mockup" : "Design Preview (Placeholder)";
-        } else {
-          brdDesignSection.classList.remove('is-visible');
-        }
-      }
-      
-      if (brdUploadPreview) { 
-        brdUploadPreview.innerHTML = ""; 
-        brdUploadPreview.classList.remove('has-file'); 
-      }
-      if (brdEmailInput && collected.email) brdEmailInput.value = collected.email;
-      if (brdSubmitBtn) {
-        brdSubmitBtn.disabled = false;
-        const submitText = brdSubmitBtn.querySelector('.submit-text');
-        if (submitText) submitText.textContent = "Submit & Send BRD";
-      }
-      showScreen(screenBRD);
+  const collected = window.__vapiUi.collected;
+  if (brdContent) brdContent.innerHTML = generatedBRD.html;
+  
+  if (brdDesignSection) {
+    if (generatedBRD.designImageUrl) {
+      brdDesignSection.classList.add('is-visible');
+      if (brdDesignImage) brdDesignImage.src = generatedBRD.designImageUrl;
+      if (brdDesignCaption) brdDesignCaption.textContent = generatedBRD.designSource === "gemini" ? "AI-Generated Design Mockup" : "Design Preview (Placeholder)";
+    } else {
+      brdDesignSection.classList.remove('is-visible');
     }
-
+  }
+  
+  if (brdUploadPreview) { 
+    brdUploadPreview.innerHTML = ""; 
+    brdUploadPreview.classList.remove('has-file'); 
+  }
+  
+  // Remove email input handling since we're using predefined email
+  if (brdSubmitBtn) {
+    brdSubmitBtn.disabled = false;
+    const submitText = brdSubmitBtn.querySelector('.submit-text');
+    if (submitText) submitText.textContent = "Submit & View Proposal";
+  }
+  
+  initBRDScrollHint(); // Add scroll hint
+  showScreen(screenBRD);
+}
     function handleDesignUpload(event) {
       const file = event.target.files?.[0];
       if (!file) return;

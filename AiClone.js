@@ -486,7 +486,12 @@ function showProcessing(message = 'Processing...') {
     console.log('[Processing] Showing:', message);
   }
 }
-
+function hideProcessing() {
+  if (processingOverlay) {
+    processingOverlay.classList.remove('is-active');
+    console.log('[Processing] Hidden');
+  }
+}
     
     if (!pill || !icon || !overlay) {
       logError(new Error('Required DOM elements not found'), { context: 'dom_init' });

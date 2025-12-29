@@ -1554,7 +1554,7 @@ backBtn?.addEventListener("click", () => {
           }
         }, AUDIO_CONFIG.connectionTimeoutMs);
         
-        socket.onopen = async () => {
+ /*       socket.onopen = async () => {
           try {
             clearTimeout(connectionTimeout);
             
@@ -1605,7 +1605,90 @@ backBtn?.addEventListener("click", () => {
             setState("idle");
             hideStatusIndicator();
           }
-        };
+        };*/
+        async function initAudioSafely(initFn) {
+  try {
+    return await initFn();
+  } catch (error) {
+    logError(error, { context: 'audio_init' });
+    
+    let message = 'Microphone setup failed. Please check your device settings.';
+    
+    // Specific Audio Error Handling
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      message = 'Microphone access denied. Please grant permission in your browser settings and try again.';
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      message = 'No microphone found. Please connect a microphone.';
+    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      message = 'Microphone is already in use by another application or tab.';
+    } else if (error.name === 'OverconstrainedError') {
+      message = 'The requested microphone settings are not supported by your device.';
+    } else if (error.name === 'AbortError') {
+      message = 'Microphone initialization was aborted due to a hardware issue.';
+    }
+    
+    showNotification(message, 'error');
+    throw error;
+  }
+}
+
+socket.onopen = async () => {
+  try {
+    clearTimeout(connectionTimeout);
+    
+    stream = await initAudioSafely(async () => {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+    });
+    
+    try { 
+      window.stopHandMode?.(); 
+    } catch (err) { 
+      console.warn('[HAND] stopHandMode failed', err); 
+    }
+    
+    audioContext = new(window.AudioContext || window.webkitAudioContext);
+    await audioContext.resume();
+    
+    const workletBlob = createWorkletProcessorBlob();
+    await audioContext.audioWorklet.addModule(workletBlob);
+    URL.revokeObjectURL(workletBlob);
+    
+    source = audioContext.createMediaStreamSource(stream);
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = 4.0;
+    
+    workletNode = new AudioWorkletNode(audioContext, "vapi-audio-processor");
+    workletNode.port.onmessage = msg => { 
+      socket?.readyState === WebSocket.OPEN && socket.send(msg.data); 
+      processAudioForVAD(msg.data); 
+    };
+    
+    source.connect(gainNode);
+    gainNode.connect(workletNode);
+    
+    startVADCheck();
+    isActive = true;
+    setState("active");
+    updateStatusIndicator("listening");
+    updateAudioLevel();
+    startActivityMonitoring(); // Start activity-based auto-disconnect monitoring
+    
+    showNotification("Connected successfully", 'success', 2000);
+    
+  } catch (error) {
+    logError(error, { context: 'websocket_onopen' });
+    stopCall(false);
+    setState("idle");
+    hideStatusIndicator();
+  }
+};
         
         socket.onmessage = async msg => {
           try {

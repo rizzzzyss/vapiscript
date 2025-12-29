@@ -2087,45 +2087,45 @@
       }
     }
 
-    async function generateFullBRD() {
-      const collected = window.__vapiUi.collected;
-      showScreen(screenLoading);
-      updateLoadingStatus("Generating your BRD...", 1);
-      
-      try {
-      updateLoadingStatus("Creating document content...", 1);
-      const brdHtml = await generateBRDText(collected);
-      generatedBRD.html = brdHtml;
-      generatedBRD.originalHtml = brdHtml;
-      
-      if (BRD_CONFIG.generateDesignFor.includes(collected.service)) {
-        updateLoadingStatus("Creating design mockup...", 2);
-        const designData = await generateDesignImage(collected);
-        if (designData) {
-          if (designData.image) {
-            generatedBRD.designImageBase64 = designData.image;
-            generatedBRD.designImageUrl = `data:${designData.mimeType || 'image/png'};base64,${designData.image}`;
-            generatedBRD.designSource = "gemini";
-          } else if (designData.imageUrl) {
-            generatedBRD.designImageUrl = designData.imageUrl;
-            generatedBRD.designSource = "placeholder";
-          }
+async function generateFullBRD() {
+  const collected = window.__vapiUi.collected;
+  showScreen(screenLoading);
+  updateLoadingStatus("Generating your BRD...", 1);
+  
+  try {
+    updateLoadingStatus("Creating document content...", 1);  // ✅ Fixed indentation
+    const brdHtml = await generateBRDText(collected);
+    generatedBRD.html = brdHtml;
+    generatedBRD.originalHtml = brdHtml;
+    
+    if (BRD_CONFIG.generateDesignFor.includes(collected.service)) {
+      updateLoadingStatus("Creating design mockup...", 2);
+      const designData = await generateDesignImage(collected);
+      if (designData) {
+        if (designData.image) {
+          generatedBRD.designImageBase64 = designData.image;
+          generatedBRD.designImageUrl = `data:${designData.mimeType || 'image/png'};base64,${designData.image}`;
+          generatedBRD.designSource = "gemini";
+        } else if (designData.imageUrl) {
+          generatedBRD.designImageUrl = designData.imageUrl;
+          generatedBRD.designSource = "placeholder";
         }
       }
-      
-      updateLoadingStatus("Preparing preview...", 3);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      renderBRDViewer();
-      
-    } catch (error) {
-      logError(error, { context: 'generate_full_brd' });
-      showNotification('Failed to generate BRD: ' + error.message, 'error');
-      inBRDMode = false;
-      if (closeBtn) closeBtn.style.display = '';
-      if (backBtn) backBtn.style.display = '';
-      showScreen(screenPreview);
     }
+    
+    updateLoadingStatus("Preparing preview...", 3);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    renderBRDViewer();
+    
+  } catch (error) {
+    logError(error, { context: 'generate_full_brd' });
+    showNotification('Failed to generate BRD: ' + error.message, 'error');
+    inBRDMode = false;
+    if (closeBtn) closeBtn.style.display = '';
+    if (backBtn) backBtn.style.display = '';
+    showScreen(screenPreview);
   }
+}
 
   skipCalendlyBtn?.addEventListener("click", () => {
     if (confirm("Skip scheduling for now? You can always book a call later.")) {

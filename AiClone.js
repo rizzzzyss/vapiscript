@@ -1418,7 +1418,7 @@ backBtn?.addEventListener("click", () => {
           headers,
           body: JSON.stringify({ assistantId: ASSISTANT_ID })
         }, {
-          timeout: 10000,
+          timeout: 30000,
           retries: 2
         });
         

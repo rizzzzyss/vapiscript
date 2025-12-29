@@ -1636,7 +1636,7 @@ socket.onopen = async () => {
   try {
     clearTimeout(connectionTimeout);
     
-    // 1. Initialize Audio first (Core requirement for the call)
+    // Only initialize Audio (no camera here)
     stream = await initAudioSafely(async () => {
       return await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -1648,20 +1648,8 @@ socket.onopen = async () => {
       });
     });
     
-    // 2. Initialize Camera separately (optional - call continues if it fails)
-    try {
-      const videoStream = await initCameraSafely(async () => {
-        return await navigator.mediaDevices.getUserMedia({ video: true });
-      });
-      
-      // If successful, add video track to the main stream
-      videoStream.getVideoTracks().forEach(track => stream.addTrack(track));
-      console.log('[Vapi] Camera initialized and added to stream');
-    } catch (camErr) {
-      // Camera failed: notification already shown by initCameraSafely
-      // Continue the call with audio-only
-      console.warn("[Vapi] Camera initialization failed, proceeding with audio only.");
-    }
+    // Remove the camera initialization block entirely
+    // (No initCameraSafely call here)
     
     try { 
       window.stopHandMode?.(); 

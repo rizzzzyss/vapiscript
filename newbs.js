@@ -2002,7 +2002,7 @@ function stopCall(sendEndSignal = true) {
   // ✅ NEW: Check if in BRD mode and ask for confirmation
   if (inBRDMode && isActive) {
     const confirmClose = confirm(
-      "You're currently working on your BRD document. If you end the call now, your progress will be saved but you won't be able to use voice commands.\n\nEnd call anyway?"
+      "You're currently working on your BRD document. If you end the call now, your progress will be saved but the form will close.\n\nEnd call and close form?"
     );
     
     if (!confirmClose) {
@@ -2010,8 +2010,47 @@ function stopCall(sendEndSignal = true) {
       return; // Don't stop the call
     }
     
-    // User confirmed - show notification
-    showNotification('Voice call ended. You can continue editing your document.', 'info', 4000);
+    // ✅ User confirmed - close everything
+    console.log('[STOP CALL] User confirmed - closing BRD mode and form');
+    
+    // Unlock BRD mode
+    inBRDMode = false;
+    console.log("[BRD Mode] UNLOCKED");
+    
+    // Show buttons again
+    if (closeBtn) closeBtn.style.display = '';
+    if (backBtn) backBtn.style.display = '';
+    
+    // Reset all collected data
+    window.__vapiUi.collected = {};
+    window.__vapiUi.selected.clear();
+    window.__vapiUi.flow = null;
+    window.__vapiUi.step = null;
+    window.__vapiUi.pendingField = null;
+    window.__vapiUi.lastCategory = null;
+    
+    // Reset BRD data
+    generatedBRD = { 
+      originalHtml: "", 
+      html: "", 
+      designImageBase64: null, 
+      designImageUrl: null, 
+      designSource: null, 
+      userUploadedImageBase64: null, 
+      userUploadedImageName: null, 
+      pdfBase64: null, 
+      pdfBlob: null, 
+      pdfFilename: null,
+      downloadUrl: null
+    };
+    
+    // Clear form inputs
+    if (brdEmailInput) brdEmailInput.value = "";
+    if (brdUploadInput) brdUploadInput.value = "";
+    if (emailInput) emailInput.value = "";
+    
+    // Show notification
+    showNotification('Call ended. Your progress has been cleared.', 'info', 4000);
   }
   
   window.vapiAudioLevel = 0;
@@ -2106,13 +2145,8 @@ function stopCall(sendEndSignal = true) {
   if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
   else if (pill) pill.style.transform = "scale(1)";
   
-  // ✅ UPDATED: If in BRD mode, keep overlay open
-  if (!inBRDMode) {
-    hideOverlay();
-  } else {
-    // Stay on BRD screen with overlay open
-    console.log('[STOP CALL] Staying in BRD mode after call ended');
-  }
+  // ✅ UPDATED: Always close overlay after cleanup
+  hideOverlay();
   
   hideStatusIndicator();
   setState("idle");

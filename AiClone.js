@@ -846,17 +846,23 @@ function initBRDScrollHint() {
       document.body.classList.add("vapi-overlay-open");
     }
 
-    function hideOverlay() {
-      if (inBRDMode) {
-        console.log("[hideOverlay] BLOCKED - in BRD mode");
-        return;
-      }
+ function hideOverlay() {
+      if (inBRDMode) return;
+      
       overlay.classList.remove("is-open");
       overlay.setAttribute("aria-hidden", "true");
-      window.__vapiUi.selected.clear();
       document.body.classList.remove("vapi-overlay-open");
+      
+      // Deactivate ALL screens so the next call starts from the beginning
+      [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess, screenCalendly].forEach(s => {
+        if (s) {
+          s.classList.remove("is-active");
+          s.style.opacity = "1"; // Reset opacity for next use
+        }
+      });
+      
+      window.__vapiUi.selected.clear();
     }
-
     function attemptCloseOverlay() {
   // BRD mode has special handling
   if (inBRDMode) {
@@ -1619,17 +1625,21 @@ backBtn?.addEventListener("click", () => {
           setState("idle"); 
         };
         
-     socket.onclose = (e) => { 
-  console.log("Socket Closed", e);
-  // We pass 'false' so the UI stays visible!
-  stopCall(false); 
-  
-  // If they were in the middle of a form, tell them they are offline
-  if (overlay.classList.contains('is-open')) {
-    showNotification("Voice connection lost. You can still fill the form manually.", "warning");
-    updateStatusIndicator("idle", "Offline - Progress Saved");
-  }
-}
+   socket.onclose = (event) => { 
+          // true means: Close the UI form immediately
+          stopCall(true); 
+          
+          // If it wasn't a manual hangup, inform the user
+          if (!event.wasClean) {
+            showNotification("Connection lost. Please tap the button to call again.", "error", 8000);
+          }
+        };
+        
+        socket.onerror = (error) => { 
+          logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
+          stopCall(true); 
+          showNotification("Connection error. Please try calling again.", "error", 8000);
+        };
         
       } catch (error) {
         logError(error, { context: 'start_call' });
@@ -1639,38 +1649,45 @@ backBtn?.addEventListener("click", () => {
       }
     }
 
- function stopCall(shouldHideUI = false) { // Changed default to false
-  window.vapiAudioLevel = 0;
-  window.vapiIsSpeaking = false;
-  isActive = false;
-  stopVADCheck();
-  clearActivityMonitoring();
-  
-  // Close the socket but don't crash the script
-  try { 
-    if(socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: "end-call" })); 
+function stopCall(shouldHideUI = true) {
+      window.vapiAudioLevel = 0;
+      window.vapiIsSpeaking = false;
+      isActive = false;
+      stopVADCheck();
+      clearActivityMonitoring();
+      
+      try { 
+        if (socket?.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "end-call" })); 
+        }
+      } catch (err) {
+        logError(err, { context: 'stop_call_send' });
+      }
+      
+      try { workletNode?.disconnect(); } catch {}
+      try { source?.disconnect(); } catch {}
+      try { audioContext?.close(); } catch {}
+      try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+      try { socket?.close(); } catch {}
+      
+      socket = stream = audioContext = workletNode = source = null;
+      nextPlayTime = 0;
+      pendingToolCallId = null;
+      pendingToolName = null;
+      
+      if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
+      
+      // If true, we kill the UI and wipe the collected data
+      if (shouldHideUI) {
+        hideOverlay();
+        window.__vapiUi.collected = {}; // WIPE DATA
+        window.__vapiUi.selected.clear();
+        window.__vapiUi.lastCategory = null;
+      }
+      
+      hideStatusIndicator();
+      setState("idle");
     }
-  } catch (err) {}
-  
-  // Cleanup Audio Nodes
-  try { workletNode?.disconnect(); } catch {}
-  try { source?.disconnect(); } catch {}
-  try { audioContext?.close(); } catch {}
-  try { stream?.getTracks().forEach(t => t.stop()); } catch {}
-  try { socket?.close(); } catch {}
-  
-  socket = stream = audioContext = workletNode = source = null;
-  
-  // ONLY hide the overlay if we are NOT in the middle of a flow
-  // or if specifically requested (like clicking the 'X' button)
-  if (shouldHideUI) {
-    hideOverlay();
-  }
-
-  hideStatusIndicator();
-  setState("idle");
-}
 
     function setUiProcessing(e) {
       submitTextBtn && (submitTextBtn.disabled = e);

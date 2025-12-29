@@ -2314,12 +2314,7 @@ function showSuccessScreen() {
   showScreen(screenSuccess);
 }
 
-    function showSuccessScreen(userEmail) {
-      if (successEmail) {
-        successEmail.innerHTML = `<p>📧 Sent to: <strong>${escapeHtml(userEmail)}</strong></p><p>📧 Copy to: <strong>${escapeHtml(ADMIN_EMAIL)}</strong></p>`;
-      }
-      showScreen(screenSuccess);
-    }
+
 
     function downloadPDF() {
   if (!generatedBRD.downloadUrl) { 

@@ -1643,32 +1643,49 @@ backBtn?.addEventListener("click", () => {
       }
     }
 
-function stopCall(e = true) {
-  // ... (keep all your audio cleanup code)
-  
-  try { socket?.close(); } catch {}
-  
-  socket = stream = audioContext = workletNode = source = null;
-  nextPlayTime = 0;
-  
-  // This ensures the UI closes immediately
-  if (!inBRDMode) hideOverlay(); 
-  hideStatusIndicator();
-  setState("idle");
-}
+function stopCall(sendEndSignal = true) {
+      // 1. Reset speaking states
+      window.vapiAudioLevel = 0;
+      window.vapiIsSpeaking = false;
+      isActive = false;
+      
+      // 2. Stop the background "listening" monitors
+      stopVADCheck();
+      clearActivityMonitoring();
+      
+      // 3. Inform the server the call is over (if connection is still alive)
+      try { 
+        if (sendEndSignal && socket?.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: "end-call" })); 
+        }
+      } catch (err) {
+        logError(err, { context: 'stop_call_send' });
+      }
+      
+      // 4. Release hardware (Turn off Microphone and Audio engine)
       try { workletNode?.disconnect(); } catch {}
       try { source?.disconnect(); } catch {}
       try { audioContext?.close(); } catch {}
       try { stream?.getTracks().forEach(t => t.stop()); } catch {}
       try { socket?.close(); } catch {}
       
+      // 5. Clear memory references
       socket = stream = audioContext = workletNode = source = null;
       nextPlayTime = 0;
       pendingToolCallId = null;
       pendingToolName = null;
-      pillWrap ? pillWrap.style.transform = "translateX(-50%) scale(1)" : pill.style.transform = "scale(1)";
+
+      // 6. Reset UI visuals
+      if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
+      else if (pill) pill.style.transform = "scale(1)";
+      
+      // 7. Hide the form (unless the user is reading their generated document)
       if (!inBRDMode) hideOverlay();
+      
       hideStatusIndicator();
+      setState("idle");
+      
+      console.log('[Vapi] Call stopped and resources released.');
     }
 
     function setUiProcessing(e) {

@@ -2069,32 +2069,35 @@ window.addEventListener('message', function(e) {
     }
   }
 });
-    function renderBRDViewer() {
-      const collected = window.__vapiUi.collected;
-      if (brdContent) brdContent.innerHTML = generatedBRD.html;
-      
-      if (brdDesignSection) {
-        if (generatedBRD.designImageUrl) {
-          brdDesignSection.classList.add('is-visible');
-          if (brdDesignImage) brdDesignImage.src = generatedBRD.designImageUrl;
-          if (brdDesignCaption) brdDesignCaption.textContent = generatedBRD.designSource === "gemini" ? "AI-Generated Design Mockup" : "Design Preview (Placeholder)";
-        } else {
-          brdDesignSection.classList.remove('is-visible');
-        }
-      }
-      
-      if (brdUploadPreview) { 
-        brdUploadPreview.innerHTML = ""; 
-        brdUploadPreview.classList.remove('has-file'); 
-      }
-      if (brdEmailInput && collected.email) brdEmailInput.value = collected.email;
-      if (brdSubmitBtn) {
-        brdSubmitBtn.disabled = false;
-        const submitText = brdSubmitBtn.querySelector('.submit-text');
-        if (submitText) submitText.textContent = "Submit & Send BRD";
-      }
-      showScreen(screenBRD);
+function renderBRDViewer() {
+  const collected = window.__vapiUi.collected;
+  if (brdContent) brdContent.innerHTML = generatedBRD.html;
+  
+  if (brdDesignSection) {
+    if (generatedBRD.designImageUrl) {
+      brdDesignSection.classList.add('is-visible');
+      if (brdDesignImage) brdDesignImage.src = generatedBRD.designImageUrl;
+      if (brdDesignCaption) brdDesignCaption.textContent = generatedBRD.designSource === "gemini" ? "AI-Generated Design Mockup" : "Design Preview (Placeholder)";
+    } else {
+      brdDesignSection.classList.remove('is-visible');
     }
+  }
+  
+  if (brdUploadPreview) { 
+    brdUploadPreview.innerHTML = ""; 
+    brdUploadPreview.classList.remove('has-file'); 
+  }
+  
+  // Remove email input handling since we're using predefined email
+  if (brdSubmitBtn) {
+    brdSubmitBtn.disabled = false;
+    const submitText = brdSubmitBtn.querySelector('.submit-text');
+    if (submitText) submitText.textContent = "Submit & View Proposal";
+  }
+  
+  initBRDScrollHint(); // Add scroll hint
+  showScreen(screenBRD);
+}
 
     function handleDesignUpload(event) {
       const file = event.target.files?.[0];
@@ -2253,19 +2256,16 @@ function stripHtmlWrapper(html) {
   return html;
 }
 
-    async function submitBRD() {
-  const userEmail = brdEmailInput?.value?.trim();
-  
-  if (!userEmail || !userEmail.includes('@')) { 
-    showNotification('Please enter a valid email', 'warning');
-    brdEmailInput?.focus();
-    return; 
-  }
+ // Replace the submitBRD function with this version:
+
+async function submitBRD() {
+  // Use predefined admin email instead of user input
+  const userEmail = ADMIN_EMAIL; // Send to admin email
   
   if (brdSubmitBtn) {
     brdSubmitBtn.disabled = true;
     const submitText = brdSubmitBtn.querySelector('.submit-text');
-    if (submitText) submitText.textContent = "Generating & Sending...";
+    if (submitText) submitText.textContent = "Generating Proposal...";
   }
   
   try {
@@ -2286,17 +2286,32 @@ function stripHtmlWrapper(html) {
     const result = await response.json();
     generatedBRD.downloadUrl = result.downloadUrl;
     
-    showNotification('BRD sent successfully!', 'success', 4000);
-    showSuccessScreen(userEmail);
+    showNotification('Proposal generated successfully!', 'success', 3000);
+    
+    // Show success screen without email display
+    showSuccessScreen();
     
   } catch (error) {
     logError(error, { context: 'submit_brd' });
     if (brdSubmitBtn) {
       brdSubmitBtn.disabled = false;
       const t = brdSubmitBtn.querySelector('.submit-text');
-      if (t) t.textContent = "Submit & Send BRD";
+      if (t) t.textContent = "Submit & View Proposal";
     }
   }
+}
+
+// Update showSuccessScreen to not show email info:
+
+function showSuccessScreen() {
+  if (successEmail) {
+    successEmail.innerHTML = `
+      <p style="text-align: center; color: #666; margin: 20px 0;">
+        Your proposal has been generated and is ready for review!
+      </p>
+    `;
+  }
+  showScreen(screenSuccess);
 }
 
     function showSuccessScreen(userEmail) {

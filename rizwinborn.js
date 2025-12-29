@@ -2253,19 +2253,16 @@ function stripHtmlWrapper(html) {
   return html;
 }
 
-    async function submitBRD() {
-  const userEmail = brdEmailInput?.value?.trim();
-  
-  if (!userEmail || !userEmail.includes('@')) { 
-    showNotification('Please enter a valid email', 'warning');
-    brdEmailInput?.focus();
-    return; 
-  }
+  // Replace the submitBRD function with this version:
+
+async function submitBRD() {
+  // Use predefined admin email instead of user input
+  const userEmail = ADMIN_EMAIL; // Send to admin email
   
   if (brdSubmitBtn) {
     brdSubmitBtn.disabled = true;
     const submitText = brdSubmitBtn.querySelector('.submit-text');
-    if (submitText) submitText.textContent = "Generating & Sending...";
+    if (submitText) submitText.textContent = "Generating Proposal...";
   }
   
   try {
@@ -2286,17 +2283,32 @@ function stripHtmlWrapper(html) {
     const result = await response.json();
     generatedBRD.downloadUrl = result.downloadUrl;
     
-    showNotification('BRD sent successfully!', 'success', 4000);
-    showSuccessScreen(userEmail);
+    showNotification('Proposal generated successfully!', 'success', 3000);
+    
+    // Show success screen without email display
+    showSuccessScreen();
     
   } catch (error) {
     logError(error, { context: 'submit_brd' });
     if (brdSubmitBtn) {
       brdSubmitBtn.disabled = false;
       const t = brdSubmitBtn.querySelector('.submit-text');
-      if (t) t.textContent = "Submit & Send BRD";
+      if (t) t.textContent = "Submit & View Proposal";
     }
   }
+}
+
+// Update showSuccessScreen to not show email info:
+
+function showSuccessScreen() {
+  if (successEmail) {
+    successEmail.innerHTML = `
+      <p style="text-align: center; color: #666; margin: 20px 0;">
+        Your proposal has been generated and is ready for review!
+      </p>
+    `;
+  }
+  showScreen(screenSuccess);
 }
 
     function showSuccessScreen(userEmail) {

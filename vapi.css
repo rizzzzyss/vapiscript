@@ -2782,3 +2782,46 @@ body.vapi-overlay-open{
   font-size: 12px;
   color: #999;
 }
+
+.vapi-processing-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.vapi-processing-overlay.is-active {
+  display: flex;
+  opacity: 1;
+}
+
+.processing-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #D4AF37;
+  border-radius: 50%;
+  animation: vapi-spin 0.8s linear infinite;
+}
+
+.processing-text {
+  margin-top: 16px;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@keyframes vapi-spin {
+  to { transform: rotate(360deg); }
+}

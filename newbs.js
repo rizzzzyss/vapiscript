@@ -330,31 +330,31 @@
     }
   }
 
-
-async function initCameraSafely(initFn) {
-  try {
-    return await initFn();
-  } catch (error) {
-    logError(error, { context: 'camera_init' });
-    
-    let message = 'Camera setup failed. Please check your device settings.';
-    
-    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-      message = 'Camera access denied. Please grant permission in your browser settings and try again.';
-    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-      message = 'No camera found. Please connect a webcam.';
-    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-      message = 'Camera is already in use by another application or tab.';
-    } else if (error.name === 'OverconstrainedError') {
-      message = 'The requested camera resolution is not supported by your device.';
-    } else if (error.name === 'AbortError') {
-      message = 'Camera initialization was aborted due to a hardware issue.';
+  async function initCameraSafely(initFn) {
+    try {
+      return await initFn();
+    } catch (error) {
+      logError(error, { context: 'camera_init' });
+      
+      let message = 'Camera setup failed. Please check your device settings.';
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        message = 'Camera access denied. Please grant permission in your browser settings and try again.';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        message = 'No camera found. Please connect a webcam.';
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        message = 'Camera is already in use by another application or tab.';
+      } else if (error.name === 'OverconstrainedError') {
+        message = 'The requested camera resolution is not supported by your device.';
+      } else if (error.name === 'AbortError') {
+        message = 'Camera initialization was aborted due to a hardware issue.';
+      }
+      
+      showNotification(message, 'error');
+      throw error;
     }
-    
-    showNotification(message, 'error');
-    throw error;
   }
-}
+
   // Wait for DOM to be ready
   function init() {
     
@@ -414,27 +414,6 @@ async function initCameraSafely(initFn) {
     };
 
     // ============================================
-    // ✅ NEW: RETRY CONFIGURATION
-    // ============================================
-    
-    const RETRY_CONFIG = {
-      ATTEMPT_1_DELAY: 2000,
-      ATTEMPT_2_DELAY: 4000,
-      ATTEMPT_3_DELAY: 6000,
-      MAX_TIMEOUT: 15000,
-      MAX_ATTEMPTS: 3
-    };
-
-    let retryState = {
-      currentAttempt: 0,
-      selectionData: null,
-      retryTimeoutId: null,
-      startTime: null
-    };
-
-    let responseTimes = [];
-
-    // ============================================
     // EXISTING DOM REFERENCES (UNCHANGED)
     // ============================================
 
@@ -465,6 +444,10 @@ async function initCameraSafely(initFn) {
       statusText = document.getElementById("vapiStatusText"),
       statusIcon = document.getElementById("vapiStatusIcon");
 
+    // ============================================
+    // NEW DOM REFERENCES (BRD FEATURE)
+    // ============================================
+    
     const screenLoading = document.getElementById("vapiScreenLoading"),
       loadingText = document.getElementById("vapiLoadingText"),
       loadingProgress = document.getElementById("vapiLoadingProgress");
@@ -560,6 +543,9 @@ async function initCameraSafely(initFn) {
       hasShownWarning: false
     };
 
+    // ============================================
+    // BRD MODE LOCK - Blocks ALL AI commands
+    // ============================================
     let inBRDMode = false;
     
     let generatedBRD = {
@@ -576,237 +562,249 @@ async function initCameraSafely(initFn) {
     };
 
     // ============================================
-    // ✅ NEW: RETRY HELPER FUNCTIONS
+    // TOOL CALL MANAGER CLASS
     // ============================================
 
-    function isCallActive() {
-      return isActive && socket && socket.readyState === WebSocket.OPEN;
-    }
+    class ToolCallManager {
+      constructor() {
+        this.pendingCalls = new Map();
+        this.config = {
+          responseTimeout: 12000,    // Wait 12s for response
+          maxRetries: 2,             // Retry twice on failure
+          retryDelay: 2000          // 2s base delay (progressive)
+        };
+        this.currentMessageId = null;
+      }
 
-    function updateLoadingMessage(message) {
-      if (loadingText) {
-        loadingText.textContent = message;
-      }
-      const processingText = processingOverlay?.querySelector('.processing-text');
-      if (processingText) {
-        processingText.textContent = message;
-      }
-    }
-
-    function getRetryDelay(attempt) {
-      switch(attempt) {
-        case 0: return RETRY_CONFIG.ATTEMPT_1_DELAY;
-        case 1: return RETRY_CONFIG.ATTEMPT_2_DELAY;
-        case 2: return RETRY_CONFIG.ATTEMPT_3_DELAY;
-        default: return RETRY_CONFIG.MAX_TIMEOUT;
-      }
-    }
-
-    function scheduleRetry() {
-      if (retryState.retryTimeoutId) {
-        clearTimeout(retryState.retryTimeoutId);
-        retryState.retryTimeoutId = null;
-      }
-      
-      const attempt = retryState.currentAttempt;
-      
-      if (attempt >= RETRY_CONFIG.MAX_ATTEMPTS) {
-        handleRetryFailure('Maximum retry attempts exceeded');
-        return;
-      }
-      
-      const elapsed = Date.now() - retryState.startTime;
-      if (elapsed >= RETRY_CONFIG.MAX_TIMEOUT) {
-        handleRetryFailure('Timeout exceeded');
-        return;
-      }
-      
-      const delay = getRetryDelay(attempt);
-      
-      retryState.retryTimeoutId = setTimeout(() => {
-        if (!isCallActive()) {
-          handleRetryFailure('Connection lost');
+      /**
+       * Send tool result with auto-retry logic
+       */
+      async sendToolResult(data) {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          console.warn('[ToolManager] Socket not ready');
           return;
         }
-        
-        const data = retryState.selectionData;
-        if (!data) {
-          handleRetryFailure('No selection data');
+
+        const toolCallId = pendingToolCallId;
+        if (!toolCallId) {
+          // No pending tool call - send as user message
+          sendAsUserMessage(typeof data === "string" ? data : data.value || data.userInput || JSON.stringify(data));
           return;
         }
+
+        const result = typeof data === "string" ? data : JSON.stringify(data);
+        const messageId = `${toolCallId}-${Date.now()}`;
         
-        retryState.currentAttempt++;
-        console.log(`[Auto-Retry] Attempt ${retryState.currentAttempt + 1}/${RETRY_CONFIG.MAX_ATTEMPTS + 1} after ${elapsed + delay}ms`);
-        
-        if (retryState.currentAttempt === 1) {
-          updateLoadingMessage('Still processing...');
-        } else if (retryState.currentAttempt === 2) {
-          updateLoadingMessage('Taking longer than usual...');
-          showNotification('Still processing your request...', 'warning', 3000);
-        }
-        
-        sendToolResult({ 
-          field: data.field, 
-          value: data.value, 
-          userSelected: data.value,
-          retryAttempt: retryState.currentAttempt 
+        this.currentMessageId = messageId;
+        this.pendingCalls.set(messageId, {
+          toolCallId,
+          result,
+          timestamp: Date.now(),
+          resolved: false
         });
-        sendAsUserMessage(data.value);
-        
-        scheduleRetry();
-        
-      }, delay);
-    }
 
-    function handleRetryFailure(reason) {
-      console.error('[Retry Failed]', reason, {
-        attempts: retryState.currentAttempt + 1,
-        duration: Date.now() - retryState.startTime
-      });
-      
-      hideProcessing();
-      
-      const data = retryState.selectionData;
-      if (data) {
-        if (data.isMulti) {
-          if (JSON.stringify(window.__vapiUi.collected[data.field]) === JSON.stringify(data.value)) {
-            delete window.__vapiUi.collected[data.field];
-          }
-          data.buttons?.forEach(btn => btn.classList.remove("is-selected"));
-          window.__vapiUi.selected.clear();
-        } else {
-          if (window.__vapiUi.collected[data.field] === data.value) {
-            delete window.__vapiUi.collected[data.field];
-          }
-          data.button?.classList.remove("is-selected");
+        console.log('[ToolManager] Sending tool result:', { messageId, toolCallId });
+        
+        try {
+          await this.sendWithRetry(messageId, result, toolCallId, 1);
+        } catch (error) {
+          console.error('[ToolManager] Failed after all retries:', error);
+          hideProcessing();
+          showNotification('Failed to process request. Please try again.', 'error', 5000);
           
-          if (data.isTextInput && textInput) {
-            textInput.value = '';
+          // Clean up
+          pendingToolCallId = null;
+          pendingToolName = null;
+          this.pendingCalls.delete(messageId);
+        }
+      }
+
+      /**
+       * Core retry logic with exponential backoff
+       */
+      async sendWithRetry(messageId, result, toolCallId, attempt) {
+        console.log(`[ToolManager] Attempt ${attempt}/${this.config.maxRetries + 1} for ${messageId}`);
+        
+        try {
+          // Send the tool result
+          socket.send(JSON.stringify({ 
+            type: "tool-calls-result", 
+            toolCallResult: { toolCallId, result }
+          }));
+          
+          socket.send(JSON.stringify({ 
+            type: "add-message", 
+            message: { role: "tool", tool_call_id: toolCallId, content: result }
+          }));
+
+          // Wait for response with timeout
+          const responseReceived = await this.waitForResponse(messageId);
+          
+          if (responseReceived) {
+            console.log('[ToolManager] Response received successfully');
+            this.pendingCalls.delete(messageId);
+            pendingToolCallId = null;
+            pendingToolName = null;
+            return;
+          }
+
+          // No response received within timeout
+          throw new Error('Response timeout');
+
+        } catch (error) {
+          console.warn(`[ToolManager] Attempt ${attempt} failed:`, error.message);
+          
+          // Check if we should retry
+          if (attempt <= this.config.maxRetries) {
+            const delay = this.config.retryDelay * attempt; // Progressive delay: 2s, 4s
+            
+            showNotification(
+              `Retrying... (${attempt}/${this.config.maxRetries})`, 
+              'warning', 
+              3000
+            );
+            
+            await this.sleep(delay);
+            return this.sendWithRetry(messageId, result, toolCallId, attempt + 1);
+          }
+          
+          // Max retries exceeded
+          throw new Error(`Max retries (${this.config.maxRetries}) exceeded`);
+        }
+      }
+
+      /**
+       * Wait for response with timeout
+       */
+      waitForResponse(messageId) {
+        return new Promise((resolve) => {
+          const timeoutId = setTimeout(() => {
+            console.warn('[ToolManager] Response timeout for:', messageId);
+            hideProcessing(); // Hide loader on timeout
+            resolve(false);
+          }, this.config.responseTimeout);
+
+          // Check periodically if response was received
+          const checkInterval = setInterval(() => {
+            const call = this.pendingCalls.get(messageId);
+            if (!call || call.resolved) {
+              clearTimeout(timeoutId);
+              clearInterval(checkInterval);
+              resolve(true);
+            }
+          }, 100);
+        });
+      }
+
+      /**
+       * Called when new tool call arrives (marks previous as received)
+       */
+      onResponseReceived() {
+        if (this.currentMessageId) {
+          const call = this.pendingCalls.get(this.currentMessageId);
+          if (call) {
+            console.log('[ToolManager] Marking response as received:', this.currentMessageId);
+            call.resolved = true;
           }
         }
       }
-      
-      setUiProcessing(false);
-      [...document.querySelectorAll(".vapi-cardbtn")].forEach(a => { 
-        a.disabled = false; 
-        a.style.opacity = "1"; 
-      });
-      
-      if (textInput) textInput.disabled = false;
-      if (emailInput) emailInput.disabled = false;
-      if (confirmMultiBtn) confirmMultiBtn.disabled = true;
-      
-      let errorMessage = 'Unable to process your selection. ';
-      if (reason === 'Connection lost') {
-        errorMessage += 'Connection lost. Please check your network and try again.';
-      } else if (reason === 'Timeout exceeded') {
-        errorMessage += 'Request timed out. Please try again.';
-      } else {
-        errorMessage += 'Please try again.';
+
+      /**
+       * Cleanup all pending calls
+       */
+      reset() {
+        console.log('[ToolManager] Resetting all pending calls');
+        this.pendingCalls.clear();
+        this.currentMessageId = null;
       }
-      
-      showNotification(errorMessage, 'error', 6000);
-      updateStatusIndicator("listening", "Ready - please try again");
-      
-      clearRetryState();
+
+      /**
+       * Helper: sleep for given milliseconds
+       */
+      sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
     }
 
-    function clearRetryState() {
-      if (retryState.retryTimeoutId) {
-        clearTimeout(retryState.retryTimeoutId);
+    // ============================================
+    // INITIALIZE TOOL MANAGER
+    // ============================================
+
+    const toolManager = new ToolCallManager();
+
+    // ============================================
+    // BUTTON & UI SETUP
+    // ============================================
+
+    const wrap = document.getElementById("vapi-ws-pill");
+    const btn  = document.getElementById("vapiCallBtn");
+
+    btn?.addEventListener("click", () => {
+      wrap?.classList.add("is-open");
+    });
+
+    document.getElementById('vapiSuccessCloseBtn')?.addEventListener('click', () => {
+      inBRDMode = false;
+
+      if (isActive) {
+        console.log('[Success Close] Ending voice call');
+        stopCall(true);
+        setState("idle");
       }
-      retryState = {
-        currentAttempt: 0,
-        selectionData: null,
-        retryTimeoutId: null,
-        startTime: null
+      
+      window.__vapiUi.collected = {};
+      window.__vapiUi.selected.clear();
+      window.__vapiUi.flow = null;
+      window.__vapiUi.step = null;
+      window.__vapiUi.pendingField = null;
+      window.__vapiUi.lastCategory = null;
+      
+      generatedBRD = { 
+        originalHtml: "", 
+        html: "", 
+        designImageBase64: null, 
+        designImageUrl: null, 
+        designSource: null, 
+        userUploadedImageBase64: null, 
+        userUploadedImageName: null, 
+        pdfBase64: null, 
+        pdfBlob: null, 
+        pdfFilename: null,
+        downloadUrl: null
+      };
+      
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('vapi-overlay-open');
+      
+      [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess].forEach(s => {
+        if (s) s.classList.remove('is-active');
+      });
+      
+      if (closeBtn) closeBtn.style.display = '';
+      if (backBtn) backBtn.style.display = '';
+    });
+
+    function initBRDScrollHint() {
+      const card = document.getElementById('vapiCard');
+      const hint = document.getElementById('scrollHint');
+      
+      if (!card || !hint) return;
+      
+      hint.style.opacity = '1';
+      
+      setTimeout(() => {
+        card.scrollTo({ top: 80, behavior: 'smooth' });
+        setTimeout(() => {
+          card.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 800);
+      }, 500);
+      
+      card.onscroll = function() {
+        const isAtBottom = this.scrollHeight - this.scrollTop <= this.clientHeight + 100;
+        hint.style.opacity = isAtBottom ? '0' : '1';
       };
     }
-
-    function trackResponseTime(duration) {
-      responseTimes.push(duration);
-      if (responseTimes.length > 10) {
-        responseTimes.shift();
-      }
-      
-      console.log('[Response Time]', duration + 'ms', 'avg:', Math.round(responseTimes.reduce((a,b) => a+b, 0) / responseTimes.length) + 'ms');
-    }
-
-    // [REST OF YOUR CODE CONTINUES UNCHANGED UNTIL renderCardsFromConfig...]
-
-const wrap = document.getElementById("vapi-ws-pill");
-const btn  = document.getElementById("vapiCallBtn");
-
-btn?.addEventListener("click", () => {
-  wrap?.classList.add("is-open");
-});
-
-document.getElementById('vapiSuccessCloseBtn')?.addEventListener('click', () => {
-  inBRDMode = false;
-
-    if (isActive) 
-    {
-    console.log('[Success Close] Ending voice call');
-    stopCall(true);
-    setState("idle");
-    }
-  
-  
-  window.__vapiUi.collected = {};
-  window.__vapiUi.selected.clear();
-  window.__vapiUi.flow = null;
-  window.__vapiUi.step = null;
-  window.__vapiUi.pendingField = null;
-  window.__vapiUi.lastCategory = null;
-  
-  generatedBRD = { 
-    originalHtml: "", 
-    html: "", 
-    designImageBase64: null, 
-    designImageUrl: null, 
-    designSource: null, 
-    userUploadedImageBase64: null, 
-    userUploadedImageName: null, 
-    pdfBase64: null, 
-    pdfBlob: null, 
-    pdfFilename: null,
-    downloadUrl: null
-  };
-  
-  overlay.classList.remove('is-open');
-  overlay.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('vapi-overlay-open');
-  
-  [screenCards, screenQuestion, screenPreview, screenEmail, screenLoading, screenBRD, screenSuccess].forEach(s => {
-    if (s) s.classList.remove('is-active');
-  });
-  
-  if (closeBtn) closeBtn.style.display = '';
-  if (backBtn) backBtn.style.display = '';
-});
-
-
-function initBRDScrollHint() {
-  const card = document.getElementById('vapiCard');
-  const hint = document.getElementById('scrollHint');
-  
-  if (!card || !hint) return;
-  
-  hint.style.opacity = '1';
-  
-  setTimeout(() => {
-    card.scrollTo({ top: 80, behavior: 'smooth' });
-    setTimeout(() => {
-      card.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 800);
-  }, 500);
-  
-  card.onscroll = function() {
-    const isAtBottom = this.scrollHeight - this.scrollTop <= this.clientHeight + 100;
-    hint.style.opacity = isAtBottom ? '0' : '1';
-  };
-}
-    
     
     // ============================================
     // STATUS INDICATOR FUNCTIONS
@@ -875,6 +873,10 @@ function initBRDScrollHint() {
     function clearIdleTimer() {
       statusState.idleTimeoutId && (clearTimeout(statusState.idleTimeoutId), statusState.idleTimeoutId = null);
     }
+
+    // ============================================
+    // ACTIVITY-BASED AUTO-DISCONNECT
+    // ============================================
 
     function checkInactivity() {
       if (!statusState.isActive) return;
@@ -961,6 +963,10 @@ function initBRDScrollHint() {
       statusIndicator && (statusIndicator.style.display = "none", statusState.isActive = false, clearIdleTimer(), clearActivityMonitoring(), stopVADCheck(), document.body.classList.remove("vapi-call-active"));
     }
 
+    // ============================================
+    // VAD FUNCTIONS
+    // ============================================
+
     function calculateRMS(e) {
       let t = 0;
       for (let n = 0; n < e.length; n++) {
@@ -1017,6 +1023,10 @@ function initBRDScrollHint() {
       }, STATUS_CONFIG.AI_SPEAKING_DECAY_MS);
     }
 
+    // ============================================
+    // BUTTON STATE
+    // ============================================
+
     const buttonConfig = {
       idle: { color: "rgb(37, 211, 102)", icon: "https://unpkg.com/lucide-static@0.321.0/icons/phone.svg" },
       loading: { color: "rgb(93, 124, 202)", icon: "https://unpkg.com/lucide-static@0.321.0/icons/loader-2.svg" },
@@ -1031,6 +1041,10 @@ function initBRDScrollHint() {
     }
 
     setState("idle");
+
+    // ============================================
+    // UI STATE
+    // ============================================
 
     window.__vapiUi = window.__vapiUi || {
       flow: null, step: null, pendingField: null, mode: "single", max: 1, selected: new Set, collected: {}, lastCategory: null
@@ -1119,18 +1133,13 @@ function initBRDScrollHint() {
       hideOverlay();
     });
 
+    // ============================================
+    // TOOL RESULT & MESSAGE FUNCTIONS - UPDATED
+    // ============================================
+
     function sendToolResult(e) {
-      if (!socket || socket.readyState !== WebSocket.OPEN) return;
-      const t = pendingToolCallId;
-      if (!t) {
-        sendAsUserMessage(typeof e == "string" ? e : e.value || e.userInput || JSON.stringify(e));
-        return;
-      }
-      const n = typeof e == "string" ? e : JSON.stringify(e);
-      socket.send(JSON.stringify({ type: "tool-calls-result", toolCallResult: { toolCallId: t, result: n } }));
-      socket.send(JSON.stringify({ type: "add-message", message: { role: "tool", tool_call_id: t, content: n } }));
-      pendingToolCallId = null;
-      pendingToolName = null;
+      // Use the tool manager for all tool results
+      toolManager.sendToolResult(e);
     }
 
     function sendAsUserMessage(e) {
@@ -1149,6 +1158,10 @@ function initBRDScrollHint() {
       e && (window.__vapiUi.collected[e] = t);
     }
 
+    // ============================================
+    // CATEGORY CARDS CONFIG
+    // ============================================
+
     const CATEGORY_CARDS = {
       main_menu: { title: "Main Menu", sub: "Please choose one.", flow: "main", step: "MAIN_MENU", field: "service", mode: "single", options: ["Website Development", "ERP Implementation", "Digital Marketing", "Consulting"], hint: "🗣️ say: Website, ERP, Marketing, or Consulting" },
       website_mode: { title: "Website Development", sub: "Do you want a ready template or a custom website?", flow: "website", step: "WEBSITE_MODE", field: "website_mode", mode: "single", options: ["Template", "Custom"], hint: "🗣️ Say the type (or tap)." },
@@ -1162,6 +1175,10 @@ function initBRDScrollHint() {
       marketing_channel: { title: "Digital Marketing", sub: "Which area do you want help with?", flow: "marketing", step: "MKT_CHANNEL", field: "marketing_channel", mode: "single", options: ["SEO", "Google Ads", "Meta Ads", "Social Media Management", "Branding/Content"], hint: "say the service" },
       consulting_topic: { title: "Consulting", sub: "What kind of consulting do you need?", flow: "consulting", step: "CONSULT_TOPIC", field: "consulting_topic", mode: "single", options: ["Strategy", "AI / Automation", "ERP / Operations", "Website / Product", "Other"], hint: "🗣️ say the topic" }
     };
+
+    // ============================================
+    // QUESTIONS CONFIG
+    // ============================================
 
     const QUESTIONS = {
       website_goal: { flow: "website", field: "website_goal", title: "Website Goal", question: "What is the main goal? Leads, bookings, sales, or info?", placeholder: "Leads / bookings / sales / info", inputType: "text" },
@@ -1184,7 +1201,7 @@ function initBRDScrollHint() {
     };
 
     // ============================================
-    // ✅ MODIFIED: renderCardsFromConfig with retry logic
+    // RENDER FUNCTIONS
     // ============================================
 
     function renderCardsFromConfig(e) {
@@ -1206,13 +1223,6 @@ function initBRDScrollHint() {
         s.textContent = n;
         s.addEventListener("click", async () => {
           recordUserActivity();
-          
-          // ✅ Check connection
-          if (!isCallActive()) {
-            showNotification('Connection lost. Please restart the call.', 'error', 3000);
-            return;
-          }
-          
           if (window.__vapiUi.mode === "multi") {
             window.__vapiUi.selected.has(n) ? window.__vapiUi.selected.delete(n) : window.__vapiUi.selected.size < window.__vapiUi.max && window.__vapiUi.selected.add(n);
             s.classList.toggle("is-selected", window.__vapiUi.selected.has(n));
@@ -1220,89 +1230,31 @@ function initBRDScrollHint() {
             setCollected(window.__vapiUi.pendingField, Array.from(window.__vapiUi.selected));
             return;
           }
-          
-          // Single select mode
           [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => a.classList.remove("is-selected"));
           s.classList.add("is-selected");
           setCollected(window.__vapiUi.pendingField, n);
-          
           showProcessing('Processing selection...');
-          
           setUiProcessing(true);
-          [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => { 
-            a.disabled = true; 
-            a.style.opacity = "0.6"; 
-          });
-          
-          // ✅ Initialize retry state
-          retryState = {
-            currentAttempt: 0,
-            selectionData: {
-              field: window.__vapiUi.pendingField,
-              value: n,
-              button: s
-            },
-            retryTimeoutId: null,
-            startTime: Date.now()
-          };
-          
-          sendToolResult({ 
-            field: window.__vapiUi.pendingField, 
-            value: n, 
-            userSelected: n,
-            retryAttempt: 0
-          });
+          [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => { a.disabled = true; a.style.opacity = "0.6"; });
+          sendToolResult({ field: window.__vapiUi.pendingField, value: n, userSelected: n });
           sendAsUserMessage(n);
-          
-          // ✅ Start retry scheduler
-          scheduleRetry();
         });
         cardsGrid.appendChild(s);
       });
       showScreen(screenCards);
     }
 
-    // ============================================
-    // ✅ MODIFIED: confirmMultiBtn with retry logic
-    // ============================================
-
     confirmMultiBtn?.addEventListener("click", async () => {
       recordUserActivity();
-      
       const e = Array.from(window.__vapiUi.selected);
       if (!e.length) return;
-      
-      if (!isCallActive()) {
-        showNotification('Connection lost. Please restart the call.', 'error', 3000);
-        return;
-      }
-      
       const t = window.__vapiUi.pendingField;
       setCollected(t, e);
       const n = e.join(", ");
-      
       showProcessing('Processing selections...');
       setUiProcessing(true);
-      
-      // ✅ Initialize retry state
-      const selectedButtons = [...cardsGrid.querySelectorAll(".vapi-cardbtn.is-selected")];
-      retryState = {
-        currentAttempt: 0,
-        selectionData: {
-          field: t,
-          value: e,
-          isMulti: true,
-          buttons: selectedButtons
-        },
-        retryTimeoutId: null,
-        startTime: Date.now()
-      };
-      
-      sendToolResult({ field: t, values: e, userSelected: n, retryAttempt: 0 });
+      sendToolResult({ field: t, values: e, userSelected: n });
       setTimeout(() => { pendingToolCallId || sendAsUserMessage(`I selected: ${n}`); }, 300);
-      
-      // ✅ Start retry scheduler
-      scheduleRetry();
     });
 
     sendEmailBtn?.addEventListener("click", async () => {
@@ -1328,20 +1280,10 @@ function initBRDScrollHint() {
       showScreen(screenQuestion);
     }
 
-    // ============================================
-    // ✅ MODIFIED: submitTextBtn with retry logic
-    // ============================================
-
     submitTextBtn?.addEventListener("click", async () => {
       recordUserActivity();
-      
       const e = String(textInput?.value || "").trim();
       if (!e) return;
-      
-      if (!isCallActive()) {
-        showNotification('Connection lost. Please restart the call.', 'error', 3000);
-        return;
-      }
       
       const t = window.__vapiUi.pendingField;
       setCollected(t, e);
@@ -1350,28 +1292,13 @@ function initBRDScrollHint() {
       
       setUiProcessing(true);
       textInput && (textInput.disabled = true);
+      sendToolResult({ field: t, value: e, userInput: e });
       
-      // ✅ Initialize retry state
-      retryState = {
-        currentAttempt: 0,
-        selectionData: {
-          field: t,
-          value: e,
-          isTextInput: true
-        },
-        retryTimeoutId: null,
-        startTime: Date.now()
-      };
-      
-      sendToolResult({ field: t, value: e, userInput: e, retryAttempt: 0 });
       setTimeout(() => { 
         if (!pendingToolCallId) {
           sendAsUserMessage(`My answer for ${t} is: ${e}`); 
         }
       }, 300);
-      
-      // ✅ Start retry scheduler
-      scheduleRetry();
     });
 
     function generatePreviewHtml(e) {
@@ -1393,9 +1320,12 @@ function initBRDScrollHint() {
       setHeader("Requirement Preview", "Approve or go back to edit.");
       previewHtmlEl && (previewHtmlEl.innerHTML = generatePreviewHtml(e));
       previewLinkEl && (previewLinkEl.style.display = "none");
-
       showScreen(screenPreview);
     }
+
+    // ============================================
+    // APPROVE BUTTON - TRIGGERS BRD MODE
+    // ============================================
 
     approveBtn?.addEventListener("click", async () => {
       console.log("[Click] Approving preview");
@@ -1448,22 +1378,17 @@ function initBRDScrollHint() {
     }
 
     // ============================================
-    // ✅ MODIFIED: handleToolCalls - clear retries on success
+    // HANDLE TOOL CALLS - UPDATED WITH TOOL MANAGER
     // ============================================
 
     function handleToolCalls(e) {
+      hideProcessing(); // ✅ Hide loader immediately
+      toolManager.onResponseReceived(); // ✅ Mark previous calls complete
+      
       const t = e?.message ?? e,
         n = t?.toolCallList ?? t?.toolCalls ?? [];
       
       recordToolActivity();
-      
-      // ✅ SUCCESS! Clear retry state and track response time
-      if (retryState.startTime) {
-        const duration = Date.now() - retryState.startTime;
-        trackResponseTime(duration);
-        console.log(`[Tool Response] Received after ${duration}ms (${retryState.currentAttempt} retries)`);
-      }
-      clearRetryState();
       
       n.forEach(i => {
         const s = i?.id || i?.toolCallId || i?.tool_call_id,
@@ -1557,6 +1482,10 @@ function initBRDScrollHint() {
       });
     }
 
+    // ============================================
+    // VOICE TO UI - BLOCKS IN BRD MODE
+    // ============================================
+
     function tryMatchOptionFromCards(e) {
       const t = CATEGORY_CARDS[window.__vapiUi.lastCategory];
       if (!t) return null;
@@ -1615,6 +1544,10 @@ function initBRDScrollHint() {
       }
     }
 
+    // ============================================
+    // AUDIO PLAYBACK
+    // ============================================
+
     function playPcm16(e, t = 16000) {
       playCtx || (playCtx = new(window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive", sampleRate: t }));
       analyser || (analyser = playCtx.createAnalyser(), analyser.fftSize = 256, analyser.smoothingTimeConstant = .85, analyserData = new Uint8Array(analyser.frequencyBinCount), analyser.connect(playCtx.destination));
@@ -1648,6 +1581,10 @@ function initBRDScrollHint() {
       pillWrap ? pillWrap.style.transform = `translateX(-50%) scale(${n})` : pill.style.transform = `scale(${n})`;
       isActive && requestAnimationFrame(updateAudioLevel);
     }
+
+    // ============================================
+    // WEBSOCKET & CALL FUNCTIONS (WITH ERROR HANDLING)
+    // ============================================
 
     async function createWebsocketCallUrl() {
       try {
@@ -1951,15 +1888,8 @@ function initBRDScrollHint() {
       }
     }
 
-    // ============================================
-    // ✅ MODIFIED: stopCall - clear retries
-    // ============================================
-
     function stopCall(sendEndSignal = true) {
       console.log('[STOP CALL] Starting cleanup. sendEndSignal:', sendEndSignal, 'isActive:', isActive);
-      
-      // ✅ Clear any pending retries
-      clearRetryState();
       
       window.vapiAudioLevel = 0;
       window.vapiIsSpeaking = false;
@@ -1967,6 +1897,9 @@ function initBRDScrollHint() {
       
       stopVADCheck();
       clearActivityMonitoring();
+      
+      // ✅ Reset tool manager
+      toolManager.reset();
       
       try { 
         if (sendEndSignal && socket?.readyState === WebSocket.OPEN) {
@@ -2074,130 +2007,421 @@ function initBRDScrollHint() {
     function setUiProcessing(e) {
       submitTextBtn && (submitTextBtn.disabled = e);
       confirmMultiBtn && (confirmMultiBtn.disabled = e || window.__vapiUi.selected.size === 0);
-      sendEmailBtn && (sendEmailContinueBtn.disabled = e);
-approveBtn && (approveBtn.disabled = e);
-textInput && (textInput.disabled = e);
-emailInput && (emailInput.disabled = e);
-const t = document.querySelector(".vapi-screen.is-active");
-t && (t.style.opacity = e ? "0.7" : "1", t.style.pointerEvents = e ? "none" : "auto");
-updateStatusIndicator(e ? "processing" : "listening");
-}
-pill.addEventListener("click", async () => {
-  try { 
-    isActive ? stopCall(true) : await startCall(); 
-    isActive || setState("idle"); 
-  } catch (error) { 
-    logError(error, { context: 'pill_click' });
-    stopCall(false); 
-    setState("idle"); 
-  }
-});
+      sendEmailBtn && (sendEmailBtn.disabled = e);
+      approveBtn && (approveBtn.disabled = e);
+      textInput && (textInput.disabled = e);
+      emailInput && (emailInput.disabled = e);
+      const t = document.querySelector(".vapi-screen.is-active");
+      t && (t.style.opacity = e ? "0.7" : "1", t.style.pointerEvents = e ? "none" : "auto");
+      updateStatusIndicator(e ? "processing" : "listening");
+    }
 
-window.addEventListener("beforeunload", () => { isActive && stopCall(false); });
-
-function updateLoadingStatus(message, step) {
-  if (loadingText) loadingText.textContent = message;
-  if (loadingProgress) {
-    const dots = loadingProgress.querySelectorAll('.progress-dot');
-    dots.forEach((dot, index) => { dot.classList.toggle('active', index < step); });
-  }
-}
-
-async function generateBRDText(collected) {
-  try {
-    const headers = { "Content-Type": "application/json" };
-    if (WORKER_SECRET) headers["X-Worker-Secret"] = WORKER_SECRET;
-    
-    const response = await safeFetch(`${GEMINI_WORKER_URL}/generate-brd`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ collected })
-    }, {
-      timeout: 60000,
-      retries: 2
+    pill.addEventListener("click", async () => {
+      try { 
+        isActive ? stopCall(true) : await startCall(); 
+        isActive || setState("idle"); 
+      } catch (error) { 
+        logError(error, { context: 'pill_click' });
+        stopCall(false); 
+        setState("idle"); 
+      }
     });
-    
-    const data = await response.json();
-    return data.html;
-    
-  } catch (error) {
-    logError(error, { context: 'generate_brd_text' });
-    throw error;
-  }
-}
 
-async function generateDesignImage(collected) {
-  try {
-    const headers = { "Content-Type": "application/json" };
-    if (WORKER_SECRET) headers["X-Worker-Secret"] = WORKER_SECRET;
-    
-    const response = await safeFetch(`${GEMINI_WORKER_URL}/generate-design`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ collected })
-    }, {
-      timeout: 60000,
-      retries: 1,
-      showNotification: false
-    });
-    
-    return await response.json();
-    
-  } catch (error) {
-    logError(error, { context: 'generate_design_image' });
-    return null;
-  }
-}
+    window.addEventListener("beforeunload", () => { isActive && stopCall(false); });
 
-async function generateFullBRD() {
-  const collected = window.__vapiUi.collected;
-  showScreen(screenLoading);
-  updateLoadingStatus("Generating your BRD...", 1);
-  
-  try {
-    updateLoadingStatus("Creating document content...", 1);
-    const brdHtml = await generateBRDText(collected);
-    generatedBRD.html = brdHtml;
-    generatedBRD.originalHtml = brdHtml;
-    
-    if (BRD_CONFIG.generateDesignFor.includes(collected.service)) {
-      updateLoadingStatus("Creating design mockup...", 2);
-      const designData = await generateDesignImage(collected);
-      if (designData) {
-        if (designData.image) {
-          generatedBRD.designImageBase64 = designData.image;
-          generatedBRD.designImageUrl = `data:${designData.mimeType || 'image/png'};base64,${designData.image}`;
-          generatedBRD.designSource = "gemini";
-        } else if (designData.imageUrl) {
-          generatedBRD.designImageUrl = designData.imageUrl;
-          generatedBRD.designSource = "placeholder";
+    // ============================================
+    // BRD GENERATION FUNCTIONS (WITH ERROR HANDLING)
+    // ============================================
+
+    function updateLoadingStatus(message, step) {
+      if (loadingText) loadingText.textContent = message;
+      if (loadingProgress) {
+        const dots = loadingProgress.querySelectorAll('.progress-dot');
+        dots.forEach((dot, index) => { dot.classList.toggle('active', index < step); });
+      }
+    }
+
+    async function generateBRDText(collected) {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (WORKER_SECRET) headers["X-Worker-Secret"] = WORKER_SECRET;
+        
+        const response = await safeFetch(`${GEMINI_WORKER_URL}/generate-brd`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ collected })
+        }, {
+          timeout: 60000,
+          retries: 2
+        });
+        
+        const data = await response.json();
+        return data.html;
+        
+      } catch (error) {
+        logError(error, { context: 'generate_brd_text' });
+        throw error;
+      }
+    }
+
+    async function generateDesignImage(collected) {
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (WORKER_SECRET) headers["X-Worker-Secret"] = WORKER_SECRET;
+        
+        const response = await safeFetch(`${GEMINI_WORKER_URL}/generate-design`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ collected })
+        }, {
+          timeout: 60000,
+          retries: 1,
+          showNotification: false
+        });
+        
+        return await response.json();
+        
+      } catch (error) {
+        logError(error, { context: 'generate_design_image' });
+        return null;
+      }
+    }
+
+    async function generateFullBRD() {
+      const collected = window.__vapiUi.collected;
+      showScreen(screenLoading);
+      updateLoadingStatus("Generating your BRD...", 1);
+      
+      try {
+      updateLoadingStatus("Creating document content...", 1);
+      const brdHtml = await generateBRDText(collected);
+      generatedBRD.html = brdHtml;
+      generatedBRD.originalHtml = brdHtml;
+      
+      if (BRD_CONFIG.generateDesignFor.includes(collected.service)) {
+        updateLoadingStatus("Creating design mockup...", 2);
+        const designData = await generateDesignImage(collected);
+        if (designData) {
+          if (designData.image) {
+            generatedBRD.designImageBase64 = designData.image;
+            generatedBRD.designImageUrl = `data:${designData.mimeType || 'image/png'};base64,${designData.image}`;
+            generatedBRD.designSource = "gemini";
+          } else if (designData.imageUrl) {
+            generatedBRD.designImageUrl = designData.imageUrl;
+            generatedBRD.designSource = "placeholder";
+          }
         }
+      }
+      
+      updateLoadingStatus("Preparing preview...", 3);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      renderBRDViewer();
+      
+    } catch (error) {
+      logError(error, { context: 'generate_full_brd' });
+      showNotification('Failed to generate BRD: ' + error.message, 'error');
+      inBRDMode = false;
+      if (closeBtn) closeBtn.style.display = '';
+      if (backBtn) backBtn.style.display = '';
+      showScreen(screenPreview);
+    }
+  }
+
+  skipCalendlyBtn?.addEventListener("click", () => {
+    if (confirm("Skip scheduling for now? You can always book a call later.")) {
+      if (isActive) {
+        console.log('[Calendly Skip] Ending voice call');
+        stopCall(true);
+        setState("idle");
+      }
+      showNotification('You can schedule a call anytime from our website!', 'info', 5000);
+      hideOverlay();
+      
+      window.__vapiUi.collected = {};
+      window.__vapiUi.selected.clear();
+      window.__vapiUi.flow = null;
+      window.__vapiUi.step = null;
+      window.__vapiUi.pendingField = null;
+      window.__vapiUi.lastCategory = null;
+    }
+  });
+
+  window.addEventListener('message', function(e) {
+    if (e.data.event && e.data.event.indexOf('calendly') === 0) {
+      if (e.data.event === 'calendly.event_scheduled') {
+        console.log('[Calendly] Event scheduled!', e.data);
+        if (isActive) {
+          stopCall(true);
+          setState("idle");
+        }
+        showNotification('Call scheduled successfully! Check your email for confirmation.', 'success', 5000);
+        
+        setTimeout(() => {
+          hideOverlay();
+          
+          window.__vapiUi.collected = {};
+          window.__vapiUi.selected.clear();
+          window.__vapiUi.flow = null;
+          window.__vapiUi.step = null;
+          window.__vapiUi.pendingField = null;
+          window.__vapiUi.lastCategory = null;
+        }, 3000);
+      }
+    }
+  });
+
+  function renderBRDViewer() {
+    const collected = window.__vapiUi.collected;
+    if (brdContent) brdContent.innerHTML = generatedBRD.html;
+    
+    if (brdDesignSection) {
+      if (generatedBRD.designImageUrl) {
+        brdDesignSection.classList.add('is-visible');
+        if (brdDesignImage) brdDesignImage.src = generatedBRD.designImageUrl;
+        if (brdDesignCaption) brdDesignCaption.textContent = generatedBRD.designSource === "gemini" ? "AI-Generated Design Mockup" : "Design Preview (Placeholder)";
+      } else {
+        brdDesignSection.classList.remove('is-visible');
       }
     }
     
-    updateLoadingStatus("Preparing preview...", 3);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    renderBRDViewer();
+    if (brdUploadPreview) { 
+      brdUploadPreview.innerHTML = ""; 
+      brdUploadPreview.classList.remove('has-file'); 
+    }
     
-  } catch (error) {
-    logError(error, { context: 'generate_full_brd' });
-    showNotification('Failed to generate BRD: ' + error.message, 'error');
+    if (brdSubmitBtn) {
+      brdSubmitBtn.disabled = false;
+      const submitText = brdSubmitBtn.querySelector('.submit-text');
+      if (submitText) submitText.textContent = "Submit & View Proposal";
+    }
+    
+    initBRDScrollHint();
+    showScreen(screenBRD);
+  }
+
+  function handleDesignUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const validation = validateFile(file, {
+      maxSizeMB: BRD_CONFIG.maxUploadSizeMB,
+      allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    });
+    
+    if (!validation.valid) {
+      if (brdUploadInput) brdUploadInput.value = "";
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const base64Full = e.target.result;
+        generatedBRD.userUploadedImageBase64 = base64Full.split(',')[1];
+        generatedBRD.userUploadedImageName = file.name;
+        
+        if (brdUploadPreview) {
+          const sanitizedFileName = escapeHtml(file.name);
+          brdUploadPreview.innerHTML = `
+            <div class="upload-preview-item">
+              <img src="${base64Full}" alt="Uploaded design">
+              <span>${sanitizedFileName}</span>
+              <button type="button" class="remove-upload" title="Remove">×</button>
+            </div>
+          `;
+          brdUploadPreview.classList.add('has-file');
+          brdUploadPreview.querySelector('.remove-upload')?.addEventListener('click', removeUploadedDesign);
+        }
+        
+        showNotification('Image uploaded successfully!', 'success', 3000);
+        
+      } catch (error) {
+        logError(error, { context: 'file_upload_process' });
+        showNotification('Failed to process image', 'error');
+      }
+    };
+    
+    reader.onerror = () => {
+      logError(new Error('File read error'), { context: 'file_reader' });
+      showNotification('Failed to read file', 'error');
+    };
+    
+    reader.readAsDataURL(file);
+  }
+
+  function removeUploadedDesign() {
+    generatedBRD.userUploadedImageBase64 = null;
+    generatedBRD.userUploadedImageName = null;
+    if (brdUploadInput) brdUploadInput.value = "";
+    if (brdUploadPreview) { 
+      brdUploadPreview.innerHTML = ""; 
+      brdUploadPreview.classList.remove('has-file'); 
+    }
+  }
+
+  function resetBRDContent() {
+    if (brdContent && generatedBRD.originalHtml) {
+      brdContent.innerHTML = generatedBRD.originalHtml;
+    }
+  }
+
+  function stripHtmlWrapper(html) {
+    if (!html) return "";
+    let content = html;
+    content = content.replace(/<!DOCTYPE[^>]*>/gi, "");
+    content = content.replace(/<html[^>]*>/gi, "");
+    content = content.replace(/<\/html>/gi, "");
+    content = content.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
+    content = content.replace(/<body[^>]*>/gi, "");
+    content = content.replace(/<\/body>/gi, "");
+    content = content.replace(/<meta[^>]*>/gi, "");
+    content = content.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "");
+    content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+    content = content.replace(/background-color:\s*#[a-fA-F0-9]+;?/gi, "");
+    content = content.replace(/background:\s*#[a-fA-F0-9]+;?/gi, "");
+    content = content.replace(/background-color:\s*rgb[^;]+;?/gi, "");
+    content = content.replace(/background:\s*rgb[^;]+;?/gi, "");
+    content = content.replace(/background-color:\s*white;?/gi, "");
+    content = content.replace(/background:\s*white;?/gi, "");
+    content = content.replace(/color:\s*#555;?/gi, "");
+    return content.trim();
+  }
+
+  function buildPDFContent() {
+    const collected = window.__vapiUi.collected || {};
+    const today = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+    let editedBRD = (brdContent?.innerHTML && brdContent.innerHTML.trim())
+      ? brdContent.innerHTML
+      : (generatedBRD.html || "");
+    editedBRD = stripHtmlWrapper(editedBRD);
+    
+    let html = `
+      <style>
+        h1, h2, h3, h4, h5, h6 { 
+          page-break-inside: avoid; 
+          page-break-after: avoid; 
+          margin-top: 15px;
+        }
+        img { 
+          page-break-inside: avoid; 
+          display: block;
+          margin: 15px auto;
+          max-width: 100%;
+        }
+        p, ul, ol, li { 
+          page-break-inside: avoid; 
+          margin-bottom: 8px;
+        }
+      </style>
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; background:#fff;">
+        <div style="text-align: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #D4AF37; page-break-after: avoid;">
+          <h1 style="color: #333; margin: 0; font-size: 24px;">BUSINESS REQUIREMENTS DOCUMENT</h1>
+          <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">${escapeHtml(collected.service || "Project")} | ${today}</p>
+        </div>
+        <div style="margin-bottom: 20px;">
+          ${editedBRD}
+        </div>
+    `;
+    
+    if (generatedBRD.userUploadedImageBase64) {
+      html += `
+        <div style="margin-bottom: 20px; page-break-inside: avoid;">
+          <h2 style="color: #333; border-bottom: 2px solid #D4AF37; padding-bottom: 8px;">
+            Client Reference Design
+          </h2>
+          <div style="text-align: center; margin-top: 15px;">
+            <img
+              src="data:image/png;base64,${generatedBRD.userUploadedImageBase64}"
+              style="max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 8px;"
+              alt="Client Design"
+            >
+          </div>
+        </div>
+      `;
+    }
+    
+    html += `
+        <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center;">
+          <p style="color: #888; font-size: 11px; margin: 0;">
+            Generated by BRD Generator | Contact: ${escapeHtml(ADMIN_EMAIL)}
+          </p>
+        </div>
+      </div>
+    `;
+    
+    return html;
+  }
+
+  async function submitBRD() {
+    const userEmail = ADMIN_EMAIL;
+    
+    if (brdSubmitBtn) {
+      brdSubmitBtn.disabled = true;
+      const submitText = brdSubmitBtn.querySelector('.submit-text');
+      if (submitText) submitText.textContent = "Generating Proposal...";
+    }
+    
+    try {
+      const pdfHtml = buildPDFContent();
+      
+      const response = await safeFetch(`${BRD_PDF_WORKER_URL}/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userEmail: userEmail,
+          pdfHtml: pdfHtml
+        })
+      }, {
+        timeout: 90000,
+        retries: 2
+      });
+      
+      const result = await response.json();
+      generatedBRD.downloadUrl = result.downloadUrl;
+      
+      showNotification('Proposal generated successfully!', 'success', 3000);
+      
+      showSuccessScreen();
+      
+    } catch (error) {
+      logError(error, { context: 'submit_brd' });
+      if (brdSubmitBtn) {
+        brdSubmitBtn.disabled = false;
+        const t = brdSubmitBtn.querySelector('.submit-text');
+        if (t) t.textContent = "Submit & View Proposal";
+      }
+    }
+  }
+
+  function showSuccessScreen() {
+    if (successEmail) {
+      successEmail.innerHTML = `
+        <p style="text-align: center; color: #666; margin: 20px 0;">
+          Your proposal has been generated and is ready for review!
+        </p>
+      `;
+    }
+    showScreen(screenSuccess);
+  }
+
+  function downloadPDF() {
+    if (!generatedBRD.downloadUrl) { 
+      showNotification('No PDF available', 'warning');
+      return; 
+    }
+    window.open(generatedBRD.downloadUrl, '_blank');
+  }
+
+  function startNewProject() {
     inBRDMode = false;
+    console.log("[BRD Mode] UNLOCKED");
+    
     if (closeBtn) closeBtn.style.display = '';
     if (backBtn) backBtn.style.display = '';
-    showScreen(screenPreview);
-  }
-}
-
-skipCalendlyBtn?.addEventListener("click", () => {
-  if (confirm("Skip scheduling for now? You can always book a call later.")) {
-    if (isActive) {
-      console.log('[Calendly Skip] Ending voice call');
-      stopCall(true);
-      setState("idle");
-    }
-    showNotification('You can schedule a call anytime from our website!', 'info', 5000);
-    hideOverlay();
     
     window.__vapiUi.collected = {};
     window.__vapiUi.selected.clear();
@@ -2205,336 +2429,60 @@ skipCalendlyBtn?.addEventListener("click", () => {
     window.__vapiUi.step = null;
     window.__vapiUi.pendingField = null;
     window.__vapiUi.lastCategory = null;
-  }
-});
-
-window.addEventListener('message', function(e) {
-  if (e.data.event && e.data.event.indexOf('calendly') === 0) {
-    if (e.data.event === 'calendly.event_scheduled') {
-      console.log('[Calendly] Event scheduled!', e.data);
-      if (isActive) {
-        stopCall(true);
-        setState("idle");
-      }
-      showNotification('Call scheduled successfully! Check your email for confirmation.', 'success', 5000);
-      
-      setTimeout(() => {
-        hideOverlay();
-        
-        window.__vapiUi.collected = {};
-        window.__vapiUi.selected.clear();
-        window.__vapiUi.flow = null;
-        window.__vapiUi.step = null;
-        window.__vapiUi.pendingField = null;
-        window.__vapiUi.lastCategory = null;
-      }, 3000);
-    }
-  }
-});
-
-function renderBRDViewer() {
-  const collected = window.__vapiUi.collected;
-  if (brdContent) brdContent.innerHTML = generatedBRD.html;
-  
-  if (brdDesignSection) {
-    if (generatedBRD.designImageUrl) {
-      brdDesignSection.classList.add('is-visible');
-      if (brdDesignImage) brdDesignImage.src = generatedBRD.designImageUrl;
-      if (brdDesignCaption) brdDesignCaption.textContent = generatedBRD.designSource === "gemini" ? "AI-Generated Design Mockup" : "Design Preview (Placeholder)";
-    } else {
-      brdDesignSection.classList.remove('is-visible');
-    }
-  }
-  
-  if (brdUploadPreview) { 
-    brdUploadPreview.innerHTML = ""; 
-    brdUploadPreview.classList.remove('has-file'); 
-  }
-  
-  if (brdSubmitBtn) {
-    brdSubmitBtn.disabled = false;
-    const submitText = brdSubmitBtn.querySelector('.submit-text');
-    if (submitText) submitText.textContent = "Submit & View Proposal";
-  }
-  
-  initBRDScrollHint();
-  showScreen(screenBRD);
-}
-
-function handleDesignUpload(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  
-  const validation = validateFile(file, {
-    maxSizeMB: BRD_CONFIG.maxUploadSizeMB,
-    allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-  });
-  
-  if (!validation.valid) {
+    
+    generatedBRD = { 
+      originalHtml: "", 
+      html: "", 
+      designImageBase64: null, 
+      designImageUrl: null, 
+      designSource: null, 
+      userUploadedImageBase64: null, 
+      userUploadedImageName: null, 
+      pdfBase64: null, 
+      pdfBlob: null, 
+      pdfFilename: null,
+      downloadUrl: null
+    };
+    
+    if (brdEmailInput) brdEmailInput.value = "";
     if (brdUploadInput) brdUploadInput.value = "";
-    return;
+    if (emailInput) emailInput.value = "";
+    
+    hideOverlay();
   }
-  
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const base64Full = e.target.result;
-      generatedBRD.userUploadedImageBase64 = base64Full.split(',')[1];
-      generatedBRD.userUploadedImageName = file.name;
-      
-      if (brdUploadPreview) {
-        const sanitizedFileName = escapeHtml(file.name);
-        brdUploadPreview.innerHTML = `
-          <div class="upload-preview-item">
-            <img src="${base64Full}" alt="Uploaded design">
-            <span>${sanitizedFileName}</span>
-            <button type="button" class="remove-upload" title="Remove">×</button>
-          </div>
-        `;
-        brdUploadPreview.classList.add('has-file');
-        brdUploadPreview.querySelector('.remove-upload')?.addEventListener('click', removeUploadedDesign);
-      }
-      
-      showNotification('Image uploaded successfully!', 'success', 3000);
-      
-    } catch (error) {
-      logError(error, { context: 'file_upload_process' });
-      showNotification('Failed to process image', 'error');
-    }
+
+  // ============================================
+  // EVENT LISTENERS
+  // ============================================
+
+  brdUploadBtn?.addEventListener("click", () => { brdUploadInput?.click(); });
+  brdUploadInput?.addEventListener("change", handleDesignUpload);
+  brdResetBtn?.addEventListener("click", resetBRDContent);
+  brdSubmitBtn?.addEventListener("click", submitBRD);
+  successDownloadBtn?.addEventListener("click", downloadPDF);
+  successNewBtn?.addEventListener("click", startNewProject);
+
+  // ============================================
+  // DEBUG
+  // ============================================
+
+  window.__vapiDebug = {
+    getCollected: () => window.__vapiUi.collected,
+    getGeneratedBRD: () => generatedBRD,
+    getBRDMode: () => inBRDMode,
+    unlockBRDMode: () => { inBRDMode = false; if (closeBtn) closeBtn.style.display = ''; console.log("BRD mode unlocked"); },
+    testPDFContent: () => buildPDFContent(),
+    getErrorLog: () => errorLog,
+    clearErrorLog: () => errorLog.length = 0,
+    getToolManager: () => toolManager
   };
-  
-  reader.onerror = () => {
-    logError(new Error('File read error'), { context: 'file_reader' });
-    showNotification('Failed to read file', 'error');
-  };
-  
-  reader.readAsDataURL(file);
+
+  console.log('[Vapi] Voice assistant initialized with error handling and tool call retry system!');
 }
 
-function removeUploadedDesign() {
-  generatedBRD.userUploadedImageBase64 = null;
-  generatedBRD.userUploadedImageName = null;
-  if (brdUploadInput) brdUploadInput.value = "";
-  if (brdUploadPreview) { 
-    brdUploadPreview.innerHTML = ""; 
-    brdUploadPreview.classList.remove('has-file'); 
-  }
-}
-
-function resetBRDContent() {
-  if (brdContent && generatedBRD.originalHtml) {
-    brdContent.innerHTML = generatedBRD.originalHtml;
-  }
-}
-
-function stripHtmlWrapper(html) {
-  if (!html) return "";
-  let content = html;
-  content = content.replace(/<!DOCTYPE[^>]*>/gi, "");
-  content = content.replace(/<html[^>]*>/gi, "");
-  content = content.replace(/<\/html>/gi, "");
-  content = content.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
-  content = content.replace(/<body[^>]*>/gi, "");
-  content = content.replace(/<\/body>/gi, "");
-  content = content.replace(/<meta[^>]*>/gi, "");
-  content = content.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, "");
-  content = content.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
-  content = content.replace(/background-color:\s*#[a-fA-F0-9]+;?/gi, "");
-  content = content.replace(/background:\s*#[a-fA-F0-9]+;?/gi, "");
-  content = content.replace(/background-color:\s*rgb[^;]+;?/gi, "");
-  content = content.replace(/background:\s*rgb[^;]+;?/gi, "");
-  content = content.replace(/background-color:\s*white;?/gi, "");
-  content = content.replace(/background:\s*white;?/gi, "");
-  content = content.replace(/color:\s*#555;?/gi, "");
-  return content.trim();
-}
-
-function buildPDFContent() {
-  const collected = window.__vapiUi.collected || {};
-  const today = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
-  let editedBRD = (brdContent?.innerHTML && brdContent.innerHTML.trim())
-    ? brdContent.innerHTML
-    : (generatedBRD.html || "");
-  editedBRD = stripHtmlWrapper(editedBRD);
-  
-  let html = `
-    <style>
-      h1, h2, h3, h4, h5, h6 { 
-        page-break-inside: avoid; 
-        page-break-after: avoid; 
-        margin-top: 15px;
-      }
-      img { 
-        page-break-inside: avoid; 
-        display: block;
-        margin: 15px auto;
-        max-width: 100%;
-      }
-      p, ul, ol, li { 
-        page-break-inside: avoid; 
-        margin-bottom: 8px;
-      }
-    </style>
-    <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; background:#fff;">
-      <div style="text-align: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #D4AF37; page-break-after: avoid;">
-        <h1 style="color: #333; margin: 0; font-size: 24px;">BUSINESS REQUIREMENTS DOCUMENT</h1>
-        <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">${escapeHtml(collected.service || "Project")} | ${today}</p>
-      </div>
-      <div style="margin-bottom: 20px;">
-        ${editedBRD}
-      </div>
-  `;
-  
-  if (generatedBRD.userUploadedImageBase64) {
-    html += `
-      <div style="margin-bottom: 20px; page-break-inside: avoid;">
-        <h2 style="color: #333; border-bottom: 2px solid #D4AF37; padding-bottom: 8px;">
-          Client Reference Design
-        </h2>
-        <div style="text-align: center; margin-top: 15px;">
-          <img
-            src="data:image/png;base64,${generatedBRD.userUploadedImageBase64}"
-            style="max-width: 100%; max-height: 400px; border: 1px solid #ddd; border-radius: 8px;"
-            alt="Client Design"
-          >
-        </div>
-      </div>
-    `;
-  }
-  
-  html += `
-      <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center;">
-        <p style="color: #888; font-size: 11px; margin: 0;">
-          Generated by BRD Generator | Contact: ${escapeHtml(ADMIN_EMAIL)}
-        </p>
-      </div>
-    </div>
-  `;
-  
-  return html;
-}
-
-async function submitBRD() {
-  const userEmail = ADMIN_EMAIL;
-  
-  if (brdSubmitBtn) {
-    brdSubmitBtn.disabled = true;
-    const submitText = brdSubmitBtn.querySelector('.submit-text');
-    if (submitText) submitText.textContent = "Generating Proposal...";
-  }
-  
-  try {
-    const pdfHtml = buildPDFContent();
-    
-    const response = await safeFetch(`${BRD_PDF_WORKER_URL}/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userEmail: userEmail,
-        pdfHtml: pdfHtml
-      })
-    }, {
-      timeout: 90000,
-      retries: 2
-    });
-    
-    const result = await response.json();
-    generatedBRD.downloadUrl = result.downloadUrl;
-    
-    showNotification('Proposal generated successfully!', 'success', 3000);
-    
-    showSuccessScreen();
-    
-  } catch (error) {
-    logError(error, { context: 'submit_brd' });
-    if (brdSubmitBtn) {
-      brdSubmitBtn.disabled = false;
-      const t = brdSubmitBtn.querySelector('.submit-text');
-      if (t) t.textContent = "Submit & View Proposal";
-    }
-  }
-}
-
-function showSuccessScreen() {
-  if (successEmail) {
-    successEmail.innerHTML = `
-      <p style="text-align: center; color: #666; margin: 20px 0;">
-        Your proposal has been generated and is ready for review!
-      </p>
-    `;
-  }
-  showScreen(screenSuccess);
-}
-
-function downloadPDF() {
-  if (!generatedBRD.downloadUrl) { 
-    showNotification('No PDF available', 'warning');
-    return; 
-  }
-  window.open(generatedBRD.downloadUrl, '_blank');
-}
-
-function startNewProject() {
-  inBRDMode = false;
-  console.log("[BRD Mode] UNLOCKED");
-  
-  if (closeBtn) closeBtn.style.display = '';
-  if (backBtn) backBtn.style.display = '';
-  
-  window.__vapiUi.collected = {};
-  window.__vapiUi.selected.clear();
-  window.__vapiUi.flow = null;
-  window.__vapiUi.step = null;
-  window.__vapiUi.pendingField = null;
-  window.__vapiUi.lastCategory = null;
-  
-  generatedBRD = { 
-    originalHtml: "", 
-    html: "", 
-    designImageBase64: null, 
-    designImageUrl: null, 
-    designSource: null, 
-    userUploadedImageBase64: null, 
-    userUploadedImageName: null, 
-    pdfBase64: null, 
-    pdfBlob: null, 
-    pdfFilename: null,
-    downloadUrl: null
-  };
-  
-  if (brdEmailInput) brdEmailInput.value = "";
-  if (brdUploadInput) brdUploadInput.value = "";
-  if (emailInput) emailInput.value = "";
-  
-  hideOverlay();
-}
-
-brdUploadBtn?.addEventListener("click", () => { brdUploadInput?.click(); });
-brdUploadInput?.addEventListener("change", handleDesignUpload);
-brdResetBtn?.addEventListener("click", resetBRDContent);
-brdSubmitBtn?.addEventListener("click", submitBRD);
-successDownloadBtn?.addEventListener("click", downloadPDF);
-successNewBtn?.addEventListener("click", startNewProject);
-
-window.__vapiDebug = {
-  getCollected: () => window.__vapiUi.collected,
-  getGeneratedBRD: () => generatedBRD,
-  getBRDMode: () => inBRDMode,
-  unlockBRDMode: () => { inBRDMode = false; if (closeBtn) closeBtn.style.display = ''; console.log("BRD mode unlocked"); },
-  testPDFContent: () => buildPDFContent(),
-  getErrorLog: () => errorLog,
-  clearErrorLog: () => errorLog.length = 0
-};
-
-console.log('[Vapi] Voice assistant initialized with error handling and auto-retry!');
-}
 if (document.readyState === 'loading') {
-document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', init);
 } else {
-init();
+  init();
 }
 })();

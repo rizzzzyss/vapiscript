@@ -2048,7 +2048,10 @@ window.addEventListener('message', function(e) {
   if (e.data.event && e.data.event.indexOf('calendly') === 0) {
     if (e.data.event === 'calendly.event_scheduled') {
       console.log('[Calendly] Event scheduled!', e.data);
-      
+        if (isActive) {
+    stopCall(true);
+    setState("idle");
+  }
       showNotification('Call scheduled successfully! Check your email for confirmation.', 'success', 5000);
       
       // Close overlay after booking

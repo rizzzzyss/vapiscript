@@ -1613,16 +1613,27 @@ backBtn?.addEventListener("click", () => {
           }
         };
         
-        socket.onerror = (error) => { 
-          logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
-          stopCall(false); 
-          setState("idle"); 
-        };
+ socket.onerror = (error) => { 
+  logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
+  showNotification(
+    "Network issue detected. Please call again to restart. Sorry for the trouble!", 
+    "error", 
+    8000
+  );
+  stopCall(false); 
+};
         
-        socket.onclose = () => { 
-          stopCall(false); 
-          setState("idle"); 
-        };
+   socket.onclose = (event) => {
+  // If the code is not 1000 (normal closure), it's likely a network error
+  if (event.code !== 1000 && isActive) {
+    showNotification(
+      "Connection lost. Please tap the phone icon to restart. Sorry for the trouble!", 
+      "error", 
+      0 // 0 means the notification won't disappear until clicked
+    );
+  }
+  stopCall(false); 
+};
         
       } catch (error) {
         logError(error, { context: 'start_call' });
@@ -1632,19 +1643,19 @@ backBtn?.addEventListener("click", () => {
       }
     }
 
-    function stopCall(e = true) {
-      window.vapiAudioLevel = 0;
-      window.vapiIsSpeaking = false;
-      isActive = false;
-      stopVADCheck();
-      clearActivityMonitoring(); // Clear activity monitoring
-      
-      try { 
-        e && socket?.readyState === WebSocket.OPEN && socket.send(JSON.stringify({ type: "end-call" })); 
-      } catch (err) {
-        logError(err, { context: 'stop_call_send' });
-      }
-      
+function stopCall(e = true) {
+  // ... (keep all your audio cleanup code)
+  
+  try { socket?.close(); } catch {}
+  
+  socket = stream = audioContext = workletNode = source = null;
+  nextPlayTime = 0;
+  
+  // This ensures the UI closes immediately
+  if (!inBRDMode) hideOverlay(); 
+  hideStatusIndicator();
+  setState("idle");
+}
       try { workletNode?.disconnect(); } catch {}
       try { source?.disconnect(); } catch {}
       try { audioContext?.close(); } catch {}

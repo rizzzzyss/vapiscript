@@ -368,11 +368,11 @@ async function initCameraSafely(initFn) {
       BRIDGE_SECRET = null,
       UI_EVENT_ENDPOINT = null,
       AUDIO_CONFIG = {
-        workletBufferSize: 512,
-        outputSampleRate: 16000,
-        connectionTimeoutMs: 8000,
-        minQueueAheadSec: .05,
-        maxQueueAheadSec: .8
+       workletBufferSize: 512,
+  outputSampleRate: 16000,
+  connectionTimeoutMs: 15000, // Changed from 8000 to 15000
+  minQueueAheadSec: .05,
+  maxQueueAheadSec: .8
       },
       STATUS_CONFIG = {
         IDLE_TIMEOUT_MS: 8000,
@@ -1730,26 +1730,35 @@ socket.onopen = async () => {
           }
         };
         
- socket.onerror = (error) => { 
+socket.onerror = (error) => { 
   logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
-  showNotification(
-    "Network issue detected. Please call again to restart. Sorry for the trouble!", 
-    "error", 
-    8000
-  );
-  stopCall(false); 
-};
-        
-   socket.onclose = (event) => {
-  // If the code is not 1000 (normal closure), it's likely a network error
-  if (event.code !== 1000 && isActive) {
+  
+  // Only show notification if call was active (not during initial connection)
+  if (isActive) {
     showNotification(
-      "Connection lost. Please tap the phone icon to restart. Sorry for the trouble!", 
-      "error", 
-      0 // 0 means the notification won't disappear until clicked
+      "Connection issue detected. Attempting to reconnect...", 
+      "warning", 
+      5000
     );
   }
-  stopCall(false); 
+};
+        
+ socket.onclose = (event) => {
+  const wasActive = isActive;
+  stopCall(false);
+  
+  // Only show notification for unexpected disconnections during active calls
+  // Code 1000 = normal closure, 1001 = going away, 1005 = no status received
+  const isAbnormalClosure = event.code !== 1000 && event.code !== 1001 && event.code !== 1005;
+  
+  if (wasActive && isAbnormalClosure) {
+    console.error('[WebSocket] Abnormal closure:', event.code, event.reason);
+    showNotification(
+      "Connection lost. Please tap the phone icon to restart.", 
+      "error", 
+      8000
+    );
+  }
 };
         
       } catch (error) {

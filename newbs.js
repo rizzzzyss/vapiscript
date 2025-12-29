@@ -1888,7 +1888,7 @@
       }
     }
 
-    function stopCall(sendEndSignal = true) {
+   /* function stopCall(sendEndSignal = true) {
       console.log('[STOP CALL] Starting cleanup. sendEndSignal:', sendEndSignal, 'isActive:', isActive);
       
       window.vapiAudioLevel = 0;
@@ -1995,8 +1995,132 @@
       setUiProcessing(false);
       
       console.log('[STOP CALL] Cleanup complete');
+    }*/
+function stopCall(sendEndSignal = true) {
+  console.log('[STOP CALL] Starting cleanup. sendEndSignal:', sendEndSignal, 'isActive:', isActive);
+  
+  // ✅ NEW: Check if in BRD mode and ask for confirmation
+  if (inBRDMode && isActive) {
+    const confirmClose = confirm(
+      "You're currently working on your BRD document. If you end the call now, your progress will be saved but you won't be able to use voice commands.\n\nEnd call anyway?"
+    );
+    
+    if (!confirmClose) {
+      console.log('[STOP CALL] User cancelled - staying in BRD mode with call active');
+      return; // Don't stop the call
     }
+    
+    // User confirmed - show notification
+    showNotification('Voice call ended. You can continue editing your document.', 'info', 4000);
+  }
+  
+  window.vapiAudioLevel = 0;
+  window.vapiIsSpeaking = false;
+  isActive = false;
+  
+  stopVADCheck();
+  clearActivityMonitoring();
+  
+  // ✅ Reset tool manager
+  toolManager.reset();
+  
+  try { 
+    if (sendEndSignal && socket?.readyState === WebSocket.OPEN) {
+      console.log('[STOP CALL] Sending end-call message');
+      socket.send(JSON.stringify({ type: "end-call" })); 
+    }
+  } catch (err) {
+    console.warn('[STOP CALL] Could not send end signal:', err);
+  }
+  
+  try { 
+    if (workletNode) {
+      workletNode.port.onmessage = null;
+      workletNode.disconnect();
+      console.log('[STOP CALL] Worklet disconnected');
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Worklet disconnect error:', e);
+  }
+  
+  try { 
+    if (source) {
+      source.disconnect();
+      console.log('[STOP CALL] Source disconnected');
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Source disconnect error:', e);
+  }
+  
+  try { 
+    if (audioContext && audioContext.state !== 'closed') {
+      audioContext.close();
+      console.log('[STOP CALL] Audio context closed');
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Audio context close error:', e);
+  }
+  
+  try { 
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log('[STOP CALL] Track stopped:', track.kind);
+      });
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Track stop error:', e);
+  }
+  
+  try { 
+    if (socket) {
+      const socketState = socket.readyState;
+      console.log('[STOP CALL] Closing socket, readyState:', socketState);
+      
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      
+      if (socketState === WebSocket.OPEN || socketState === WebSocket.CONNECTING) {
+        socket.close(1000, 'Client closed');
+      }
+    }
+  } catch (e) {
+    console.warn('[STOP CALL] Socket close error:', e);
+  }
+  
+  socket = null;
+  stream = null;
+  audioContext = null;
+  workletNode = null;
+  source = null;
+  nextPlayTime = 0;
+  
+  pendingToolCallId = null;
+  pendingToolName = null;
+  
+  analyser = null;
+  analyserData = null;
 
+  if (pillWrap) pillWrap.style.transform = "translateX(-50%) scale(1)";
+  else if (pill) pill.style.transform = "scale(1)";
+  
+  // ✅ UPDATED: If in BRD mode, keep overlay open
+  if (!inBRDMode) {
+    hideOverlay();
+  } else {
+    // Stay on BRD screen with overlay open
+    console.log('[STOP CALL] Staying in BRD mode after call ended');
+  }
+  
+  hideStatusIndicator();
+  setState("idle");
+  
+  setUiProcessing(false);
+  
+  console.log('[STOP CALL] Cleanup complete');
+}
     function resetToolCallState() {
       console.log('[Reset Tool State] Clearing pending tool calls');
       pendingToolCallId = null;

@@ -2025,6 +2025,11 @@ function stopCall(sendEndSignal = true) {
     // Skip Calendly button
 skipCalendlyBtn?.addEventListener("click", () => {
   if (confirm("Skip scheduling for now? You can always book a call later.")) {
+      if (isActive) {
+      console.log('[Calendly Skip] Ending voice call');
+      stopCall(true);
+      setState("idle");
+    }
     showNotification('You can schedule a call anytime from our website!', 'info', 5000);
     hideOverlay();
     

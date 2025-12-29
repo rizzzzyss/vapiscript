@@ -475,6 +475,18 @@ async function initCameraSafely(initFn) {
     const screenCalendly = document.getElementById("vapiScreenCalendly"),
       calendlyWidget = document.getElementById("calendlyWidget"),
   skipCalendlyBtn = document.getElementById("vapiSkipCalendly");
+
+const processingOverlay = document.getElementById('vapiProcessingOverlay');
+
+function showProcessing(message = 'Processing...') {
+  if (processingOverlay) {
+    const textEl = processingOverlay.querySelector('.processing-text');
+    if (textEl) textEl.textContent = message;
+    processingOverlay.classList.add('is-active');
+    console.log('[Processing] Showing:', message);
+  }
+}
+
     
     if (!pill || !icon || !overlay) {
       logError(new Error('Required DOM elements not found'), { context: 'dom_init' });
@@ -902,6 +914,7 @@ function initBRDScrollHint() {
 }
 
     function showScreen(e) {
+      hideProcessing(); // ← ADD THIS LINE AT THE TOP
       showOverlay();
       setUiProcessing(false);
       textInput && (textInput.disabled = false);
@@ -1089,17 +1102,39 @@ backBtn?.addEventListener("click", () => {
       showScreen(screenQuestion);
     }
 
-    submitTextBtn?.addEventListener("click", async () => {
+   /* submitTextBtn?.addEventListener("click", async () => {
       recordUserActivity(); // Record user interaction
       const e = String(textInput?.value || "").trim();
       if (!e) return;
       const t = window.__vapiUi.pendingField;
       setCollected(t, e);
+      
       setUiProcessing(true);
       textInput && (textInput.disabled = true);
       sendToolResult({ field: t, value: e, userInput: e });
       setTimeout(() => { pendingToolCallId || sendAsUserMessage(`My answer for ${t} is: ${e}`); }, 300);
-    });
+    });*/
+
+    submitTextBtn?.addEventListener("click", async () => {
+  recordUserActivity(); // Record user interaction
+  const e = String(textInput?.value || "").trim();
+  if (!e) return;
+  
+  const t = window.__vapiUi.pendingField;
+  setCollected(t, e);
+  
+  showProcessing('Sending your answer...'); // Show loader immediately
+  
+  setUiProcessing(true);
+  textInput && (textInput.disabled = true);
+  sendToolResult({ field: t, value: e, userInput: e });
+  
+  setTimeout(() => { 
+    if (!pendingToolCallId) {
+      sendAsUserMessage(`My answer for ${t} is: ${e}`); 
+    }
+  }, 300);
+});
 
     function generatePreviewHtml(e) {
       const t = window.__vapiUi.collected || {}, n = [];

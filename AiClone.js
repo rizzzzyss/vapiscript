@@ -1062,6 +1062,8 @@ backBtn?.addEventListener("click", () => {
           [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => a.classList.remove("is-selected"));
           s.classList.add("is-selected");
           setCollected(window.__vapiUi.pendingField, n);
+            showProcessing('Processing selection...'); // ← ADD THIS LINE
+
           setUiProcessing(true);
           [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => { a.disabled = true; a.style.opacity = "0.6"; });
           sendToolResult({ field: window.__vapiUi.pendingField, value: n, userSelected: n });

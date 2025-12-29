@@ -1618,11 +1618,7 @@ backBtn?.addEventListener("click", () => {
           }
         };
         
-        socket.onerror = (error) => { 
-          logError(new Error('WebSocket error'), { context: 'websocket_onerror', error });
-          stopCall(false); 
-          setState("idle"); 
-        };
+      
         
 socket.onclose = (event) => { 
   console.log('[Vapi] Socket Closed:', event);
@@ -1632,12 +1628,11 @@ socket.onclose = (event) => {
   }
 };
         
-      socket.onerror = (error) => { 
+   socket.onerror = (error) => { 
   console.error('[Vapi] Socket Error:', error);
   stopCall(true); // TRUE forces the UI to vanish
   showNotification("Connection error. Please try again.", "error", 5000);
 };
-
 function stopCall(shouldHideUI = true) {
   isActive = false;
   window.vapiAudioLevel = 0;

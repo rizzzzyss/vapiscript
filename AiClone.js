@@ -1605,6 +1605,10 @@ backBtn?.addEventListener("click", () => {
             hideStatusIndicator();
           }
         };*/
+
+        window.initCameraSafely = initCameraSafely;
+
+console.log('[Vapi] initCameraSafely exposed globally for hand tracking');
         async function initAudioSafely(initFn) {
   try {
     return await initFn();

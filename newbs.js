@@ -569,8 +569,8 @@
   constructor() {
     this.pendingCalls = new Map();
     this.config = {
-      responseTimeout: 8000,
-      maxRetries: 1,
+      responseTimeout: 10000,
+      maxRetries: 2,
       retryDelay: 2000
     };
     this.currentMessageId = null;

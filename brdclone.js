@@ -1325,52 +1325,136 @@
         s.type = "button";
         s.className = "vapi-cardbtn";
         s.textContent = n;
-        s.addEventListener("click", async () => {
-          recordUserActivity();
-          if (window.__vapiUi.mode === "multi") {
-            window.__vapiUi.selected.has(n) ? window.__vapiUi.selected.delete(n) : window.__vapiUi.selected.size < window.__vapiUi.max && window.__vapiUi.selected.add(n);
-            s.classList.toggle("is-selected", window.__vapiUi.selected.has(n));
-            confirmMultiBtn && (confirmMultiBtn.disabled = window.__vapiUi.selected.size === 0);
-            setCollected(window.__vapiUi.pendingField, Array.from(window.__vapiUi.selected));
-            return;
-          }
-          [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => a.classList.remove("is-selected"));
-          s.classList.add("is-selected");
-          setCollected(window.__vapiUi.pendingField, n);
-          showProcessing('Processing selection...');
-          setUiProcessing(true);
-          [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => { a.disabled = true; a.style.opacity = "0.6"; });
-          sendToolResult({ field: window.__vapiUi.pendingField, value: n, userSelected: n });
-          sendAsUserMessage(n);
-        });
+       s.addEventListener("click", async () => {
+  recordUserActivity();
+  
+  if (window.__vapiUi.mode === "multi") {
+    window.__vapiUi.selected.has(n) ? window.__vapiUi.selected.delete(n) : window.__vapiUi.selected.size < window.__vapiUi.max && window.__vapiUi.selected.add(n);
+    s.classList.toggle("is-selected", window.__vapiUi.selected.has(n));
+    confirmMultiBtn && (confirmMultiBtn.disabled = window.__vapiUi.selected.size === 0);
+    setCollected(window.__vapiUi.pendingField, Array.from(window.__vapiUi.selected));
+    return;
+  }
+  
+  // ✅ Prevent double-clicks
+  if (s.disabled) return;
+  
+  [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => a.classList.remove("is-selected"));
+  s.classList.add("is-selected");
+  setCollected(window.__vapiUi.pendingField, n);
+  
+  showProcessing('Processing selection...');
+  setUiProcessing(true);
+  [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => { 
+    a.disabled = true; 
+    a.style.opacity = "0.6"; 
+  });
+  
+  // ✅ AUTO-RECOVERY: Reset UI after 6 seconds if no response
+  const recoveryTimeout = setTimeout(() => {
+    console.warn('[Card] Auto-recovery: No response received, resetting UI');
+    
+    hideProcessing();
+    setUiProcessing(false);
+    
+    // ✅ Clear pending state
+    pendingToolCallId = null;
+    pendingToolName = null;
+    toolManager.reset();
+    
+    // Re-enable buttons
+    [...cardsGrid.querySelectorAll(".vapi-cardbtn")].forEach(a => { 
+      a.disabled = false; 
+      a.style.opacity = "1"; 
+    });
+    
+    showNotification('No response received. Please try again.', 'warning', 4000);
+  }, 6000);
+  
+  window.__vapiRecoveryTimeout = recoveryTimeout;
+  
+  sendToolResult({ field: window.__vapiUi.pendingField, value: n, userSelected: n });
+  sendAsUserMessage(n);
+});
         cardsGrid.appendChild(s);
       });
       showScreen(screenCards);
     }
 
-    confirmMultiBtn?.addEventListener("click", async () => {
-      recordUserActivity();
-      const e = Array.from(window.__vapiUi.selected);
-      if (!e.length) return;
-      const t = window.__vapiUi.pendingField;
-      setCollected(t, e);
-      const n = e.join(", ");
-      showProcessing('Processing selections...');
-      setUiProcessing(true);
-      sendToolResult({ field: t, values: e, userSelected: n });
-      setTimeout(() => { pendingToolCallId || sendAsUserMessage(`I selected: ${n}`); }, 300);
-    });
+   confirmMultiBtn?.addEventListener("click", async () => {
+  recordUserActivity();
+  const e = Array.from(window.__vapiUi.selected);
+  if (!e.length) return;
+  
+  // ✅ Prevent double-submit
+  if (confirmMultiBtn.disabled) return;
+  
+  const t = window.__vapiUi.pendingField;
+  setCollected(t, e);
+  const n = e.join(", ");
+  
+  showProcessing('Processing selections...');
+  setUiProcessing(true);
+  
+  // ✅ AUTO-RECOVERY
+  const recoveryTimeout = setTimeout(() => {
+    console.warn('[Multi] Auto-recovery: No response received, resetting UI');
+    
+    hideProcessing();
+    setUiProcessing(false);
+    
+    // ✅ Clear pending state
+    pendingToolCallId = null;
+    pendingToolName = null;
+    toolManager.reset();
+    
+    if (confirmMultiBtn) confirmMultiBtn.disabled = window.__vapiUi.selected.size === 0;
+    
+    showNotification('No response received. Please try again.', 'warning', 4000);
+  }, 6000);
+  
+  window.__vapiRecoveryTimeout = recoveryTimeout;
+  
+  sendToolResult({ field: t, values: e, userSelected: n });
+  setTimeout(() => { pendingToolCallId || sendAsUserMessage(`I selected: ${n}`); }, 300);
+});
 
-    sendEmailBtn?.addEventListener("click", async () => {
-      recordUserActivity();
-      const e = String(emailInput?.value || "").trim();
-      if (!e) return;
-      setCollected("email", e);
-      setUiProcessing(true);
-      emailInput && (emailInput.disabled = true);
-      sendToolResult({ field: "email", value: e, email: e, collected: window.__vapiUi.collected });
-      setTimeout(() => { pendingToolCallId || sendAsUserMessage(`My email is ${e}`); }, 300);
-    });
+  sendEmailBtn?.addEventListener("click", async () => {
+  recordUserActivity();
+  const e = String(emailInput?.value || "").trim();
+  if (!e) return;
+  
+  // ✅ Prevent double-submit
+  if (sendEmailBtn.disabled) return;
+  
+  setCollected("email", e);
+  
+  showProcessing('Submitting email...');
+  setUiProcessing(true);
+  emailInput && (emailInput.disabled = true);
+  
+  // ✅ AUTO-RECOVERY
+  const recoveryTimeout = setTimeout(() => {
+    console.warn('[Email] Auto-recovery: No response received, resetting UI');
+    
+    hideProcessing();
+    setUiProcessing(false);
+    
+    // ✅ Clear pending state
+    pendingToolCallId = null;
+    pendingToolName = null;
+    toolManager.reset();
+    
+    if (emailInput) emailInput.disabled = false;
+    
+    showNotification('No response received. Please try again.', 'warning', 4000);
+  }, 6000);
+  
+  window.__vapiRecoveryTimeout = recoveryTimeout;
+  
+  sendToolResult({ field: "email", value: e, email: e, collected: window.__vapiUi.collected });
+  setTimeout(() => { pendingToolCallId || sendAsUserMessage(`My email is ${e}`); }, 300);
+});
 
     function renderQuestionByKey(e) {
       const t = QUESTIONS[e];
@@ -1385,25 +1469,47 @@
     }
 
     submitTextBtn?.addEventListener("click", async () => {
-      recordUserActivity();
-      const e = String(textInput?.value || "").trim();
-      if (!e) return;
-      
-      const t = window.__vapiUi.pendingField;
-      setCollected(t, e);
-      
-      showProcessing('Sending your answer...');
-      
-      setUiProcessing(true);
-      textInput && (textInput.disabled = true);
-      sendToolResult({ field: t, value: e, userInput: e });
-      
-      setTimeout(() => { 
-        if (!pendingToolCallId) {
-          sendAsUserMessage(`My answer for ${t} is: ${e}`); 
-        }
-      }, 300);
-    });
+  recordUserActivity();
+  const e = String(textInput?.value || "").trim();
+  if (!e) return;
+  
+  // ✅ Prevent double-submit
+  if (submitTextBtn.disabled) return;
+  
+  const t = window.__vapiUi.pendingField;
+  setCollected(t, e);
+  
+  showProcessing('Sending your answer...');
+  setUiProcessing(true);
+  textInput && (textInput.disabled = true);
+  
+  // ✅ AUTO-RECOVERY
+  const recoveryTimeout = setTimeout(() => {
+    console.warn('[Text] Auto-recovery: No response received, resetting UI');
+    
+    hideProcessing();
+    setUiProcessing(false);
+    
+    // ✅ Clear pending state
+    pendingToolCallId = null;
+    pendingToolName = null;
+    toolManager.reset();
+    
+    if (textInput) textInput.disabled = false;
+    
+    showNotification('No response received. Please try again.', 'warning', 4000);
+  }, 6000);
+  
+  window.__vapiRecoveryTimeout = recoveryTimeout;
+  
+  sendToolResult({ field: t, value: e, userInput: e });
+  
+  setTimeout(() => { 
+    if (!pendingToolCallId) {
+      sendAsUserMessage(`My answer for ${t} is: ${e}`); 
+    }
+  }, 300);
+});
 
     function generatePreviewHtml(e) {
       const t = window.__vapiUi.collected || {}, n = [];
@@ -1486,6 +1592,12 @@
     // ============================================
 
    function handleToolCalls(e) {
+     
+  if (window.__vapiRecoveryTimeout) 
+  {
+    clearTimeout(window.__vapiRecoveryTimeout);
+    window.__vapiRecoveryTimeout = null;
+  }
   hideProcessing(); // ✅ Hide loader immediately
   toolManager.onResponseReceived(); // ✅ Mark previous calls complete
   
